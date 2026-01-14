@@ -1,0 +1,69 @@
+name: Feature Request
+description: Suggest a new feature for mlflow-modal
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please fill out the sections below.
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Willingness to contribute
+      description: Would you be willing to contribute this feature?
+      options:
+        - "Yes, I'd like to contribute this feature"
+        - "Yes, with guidance"
+        - "No, but I'd like someone else to work on it"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature summary
+      description: A brief description of the feature.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / Use case
+      description: Why do you need this feature? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed implementation
+      description: How would you like this feature to work? Include code examples if helpful.
+      placeholder: |
+        ```python
+        client.create_deployment(
+            name="my-model",
+            model_uri="runs:/abc/model",
+            config={"new_feature": True}
+        )
+        ```
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What alternatives have you considered?
+
+  - type: checkboxes
+    id: area
+    attributes:
+      label: Affected areas
+      options:
+        - label: Deployment (create, update, delete)
+        - label: Prediction / inference
+        - label: GPU support
+        - label: Scaling / batching
+        - label: CLI integration
+        - label: Documentation
+        - label: Other
