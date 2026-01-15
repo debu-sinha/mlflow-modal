@@ -26,7 +26,7 @@ from mlflow_modal.deployment import (
 class TestModuleExports:
     def test_version_exported(self):
         assert hasattr(mlflow_modal, "__version__")
-        assert mlflow_modal.__version__ == "0.2.4"
+        assert mlflow_modal.__version__ == "0.2.5"
 
     def test_client_exported(self):
         assert hasattr(mlflow_modal, "ModalDeploymentClient")
