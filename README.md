@@ -3,7 +3,6 @@
 [![CI](https://github.com/debu-sinha/mlflow-modal-deploy/actions/workflows/ci.yml/badge.svg)](https://github.com/debu-sinha/mlflow-modal-deploy/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/debu-sinha/mlflow-modal-deploy/actions/workflows/codeql.yml/badge.svg)](https://github.com/debu-sinha/mlflow-modal-deploy/actions/workflows/codeql.yml)
 [![PyPI version](https://badge.fury.io/py/mlflow-modal-deploy.svg)](https://badge.fury.io/py/mlflow-modal-deploy)
-[![Downloads](https://img.shields.io/pypi/dm/mlflow-modal-deploy)](https://pypi.org/project/mlflow-modal-deploy/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
