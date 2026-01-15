@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mlflow-modal-deploy"
-version = "0.2.1"
+version = "0.2.2"
 description = "MLflow deployment plugin for Modal serverless GPU infrastructure (actively maintained)"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -45,7 +45,7 @@ Repository = "https://github.com/debu-sinha/mlflow-modal-deploy"
 Issues = "https://github.com/debu-sinha/mlflow-modal-deploy/issues"
 
 [project.entry-points."mlflow.deployments"]
-modal = "mlflow_modal.deployment:ModalDeploymentClient"
+modal = "mlflow_modal.deployment"
 
 [tool.ruff]
 line-length = 120
