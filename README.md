@@ -170,7 +170,7 @@ run_local(
 
 ## Contributing
 
-Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions welcome! Please see [CONTRIBUTING.md](https://github.com/debu-sinha/mlflow-modal-deploy/blob/main/CONTRIBUTING.md) for guidelines.
 
 ### Development Setup
 
