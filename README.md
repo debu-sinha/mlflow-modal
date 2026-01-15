@@ -1,10 +1,17 @@
-# mlflow-modal
+# mlflow-modal-deploy
 
-[![CI](https://github.com/debu-sinha/mlflow-modal/actions/workflows/ci.yml/badge.svg)](https://github.com/debu-sinha/mlflow-modal/actions/workflows/ci.yml)
+[![CI](https://github.com/debu-sinha/mlflow-modal-deploy/actions/workflows/ci.yml/badge.svg)](https://github.com/debu-sinha/mlflow-modal-deploy/actions/workflows/ci.yml)
+[![PyPI version](https://badge.fury.io/py/mlflow-modal-deploy.svg)](https://badge.fury.io/py/mlflow-modal-deploy)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 Deploy MLflow models to [Modal](https://modal.com)'s serverless GPU infrastructure with a single command.
+
+## Installation
+
+```bash
+pip install mlflow-modal-deploy
+```
 
 ## Features
 
@@ -15,12 +22,6 @@ Deploy MLflow models to [Modal](https://modal.com)'s serverless GPU infrastructu
 - **Automatic dependency detection**: Extracts requirements from model artifacts
 - **Wheel file support**: Handles private dependencies packaged as wheel files
 - **MLflow CLI integration**: Use familiar `mlflow deployments` commands
-
-## Installation
-
-```bash
-pip install mlflow-modal
-```
 
 ## Quick Start
 
@@ -169,14 +170,14 @@ run_local(
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Development Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/debu-sinha/mlflow-modal.git
-cd mlflow-modal
+git clone https://github.com/debu-sinha/mlflow-modal-deploy.git
+cd mlflow-modal-deploy
 
 # Install with dev dependencies
 uv sync --extra dev
@@ -199,5 +200,5 @@ Apache License 2.0
 
 ## Support
 
-- [GitHub Issues](https://github.com/debu-sinha/mlflow-modal/issues) - Bug reports and feature requests
+- [GitHub Issues](https://github.com/debu-sinha/mlflow-modal-deploy/issues) - Bug reports and feature requests
 - [MLflow Slack](https://mlflow.org/slack) - Community discussion

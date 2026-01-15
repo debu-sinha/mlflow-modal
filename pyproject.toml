@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mlflow-modal"
-version = "0.1.0"
-description = "MLflow deployment plugin for Modal serverless infrastructure"
+name = "mlflow-modal-deploy"
+version = "0.2.0"
+description = "MLflow deployment plugin for Modal serverless GPU infrastructure (actively maintained)"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
-    {name = "Debu Sinha", email = "debu.sinha@example.com"}
+    {name = "Debu Sinha"}
 ]
 keywords = ["mlflow", "modal", "deployment", "serverless", "machine-learning"]
 classifiers = [
@@ -40,9 +40,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/debu-sinha/mlflow-modal"
-Repository = "https://github.com/debu-sinha/mlflow-modal"
-Issues = "https://github.com/debu-sinha/mlflow-modal/issues"
+Homepage = "https://github.com/debu-sinha/mlflow-modal-deploy"
+Repository = "https://github.com/debu-sinha/mlflow-modal-deploy"
+Issues = "https://github.com/debu-sinha/mlflow-modal-deploy/issues"
 
 [project.entry-points."mlflow.deployments"]
 modal = "mlflow_modal.deployment:ModalDeploymentClient"
