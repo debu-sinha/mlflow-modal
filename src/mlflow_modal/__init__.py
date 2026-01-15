@@ -16,7 +16,7 @@ from mlflow_modal.deployment import (
     target_help,
 )
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 __all__ = [
     "ModalDeploymentClient",
     "run_local",
