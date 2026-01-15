@@ -1789,7 +1789,7 @@ wheels = [
 
 [[package]]
 name = "mlflow-modal-deploy"
-version = "0.2.5"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "mlflow" },
@@ -1809,7 +1809,7 @@ dev = [
 requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "mlflow", specifier = ">=2.10.0" },
-    { name = "modal", specifier = ">=0.64.0" },
+    { name = "modal", specifier = ">=1.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
