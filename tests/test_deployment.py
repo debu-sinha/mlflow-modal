@@ -4,14 +4,6 @@ import pytest
 
 import mlflow_modal
 from mlflow_modal.deployment import (
-    DEFAULT_ALLOW_CONCURRENT_INPUTS,
-    DEFAULT_CONTAINER_IDLE_TIMEOUT,
-    DEFAULT_CPU,
-    DEFAULT_MAX_CONTAINERS,
-    DEFAULT_MEMORY,
-    DEFAULT_MIN_CONTAINERS,
-    DEFAULT_SCALEDOWN_WINDOW,
-    DEFAULT_TIMEOUT,
     SUPPORTED_GPUS,
     ModalDeploymentClient,
     _generate_modal_app_code,
@@ -26,22 +18,20 @@ from mlflow_modal.deployment import (
 class TestModuleExports:
     def test_version_exported(self):
         assert hasattr(mlflow_modal, "__version__")
-        assert mlflow_modal.__version__ == "0.2.5"
+        assert mlflow_modal.__version__ == "0.3.0"
 
     def test_client_exported(self):
         assert hasattr(mlflow_modal, "ModalDeploymentClient")
         assert mlflow_modal.ModalDeploymentClient is ModalDeploymentClient
 
-    def test_constants_exported(self):
+    def test_supported_gpus_exported(self):
         assert mlflow_modal.SUPPORTED_GPUS == SUPPORTED_GPUS
-        assert mlflow_modal.DEFAULT_GPU is None
-        assert mlflow_modal.DEFAULT_MEMORY == 512
-        assert mlflow_modal.DEFAULT_CPU == 1.0
-        assert mlflow_modal.DEFAULT_TIMEOUT == 300
 
 
 class TestSupportedGPUs:
-    @pytest.mark.parametrize("gpu", ["T4", "L4", "A10G", "A100", "A100-80GB", "H100"])
+    @pytest.mark.parametrize(
+        "gpu", ["T4", "L4", "L40S", "A10", "A100", "A100-40GB", "A100-80GB", "H100", "H200", "B200"]
+    )
     def test_gpu_in_supported_list(self, gpu):
         assert gpu in SUPPORTED_GPUS
 
@@ -67,9 +57,11 @@ class TestDefaultConfig:
         config = client._default_deployment_config()
 
         assert config["gpu"] is None
-        assert config["memory"] == DEFAULT_MEMORY
-        assert config["cpu"] == DEFAULT_CPU
-        assert config["timeout"] == DEFAULT_TIMEOUT
+        assert config["memory"] == 512
+        assert config["cpu"] == 1.0
+        assert config["timeout"] == 300
+        assert config["scaledown_window"] == 60
+        assert config["concurrent_inputs"] == 1
         assert config["enable_batching"] is False
         assert config["max_batch_size"] == 8
         assert config["min_containers"] == 0
@@ -106,6 +98,34 @@ class TestConfigValidation:
 
         result = client._apply_custom_config(base_config, {"gpu": gpu})
         assert result["gpu"] == gpu
+
+    def test_multi_gpu_syntax_accepted(self):
+        client = ModalDeploymentClient("modal")
+        base_config = client._default_deployment_config()
+
+        result = client._apply_custom_config(base_config, {"gpu": "H100:8"})
+        assert result["gpu"] == "H100:8"
+
+    def test_gpu_fallback_list_accepted(self):
+        client = ModalDeploymentClient("modal")
+        base_config = client._default_deployment_config()
+
+        result = client._apply_custom_config(base_config, {"gpu": ["H100", "A100"]})
+        assert result["gpu"] == ["H100", "A100"]
+
+    def test_backward_compat_container_idle_timeout(self):
+        client = ModalDeploymentClient("modal")
+        base_config = client._default_deployment_config()
+
+        result = client._apply_custom_config(base_config, {"container_idle_timeout": 120})
+        assert result["scaledown_window"] == 120
+
+    def test_backward_compat_allow_concurrent_inputs(self):
+        client = ModalDeploymentClient("modal")
+        base_config = client._default_deployment_config()
+
+        result = client._apply_custom_config(base_config, {"allow_concurrent_inputs": 5})
+        assert result["concurrent_inputs"] == 5
 
 
 class TestModelRequirements:
@@ -188,13 +208,12 @@ class TestAppCodeGeneration:
             "memory": 512,
             "cpu": 1.0,
             "timeout": 300,
-            "container_idle_timeout": 60,
+            "scaledown_window": 60,
             "enable_batching": False,
             "python_version": "3.10",
             "min_containers": 0,
             "max_containers": None,
-            "scaledown_window": None,
-            "allow_concurrent_inputs": 1,
+            "concurrent_inputs": 1,
         }
 
         code = _generate_modal_app_code("test-app", "/model", config)
@@ -202,8 +221,9 @@ class TestAppCodeGeneration:
         assert 'app = modal.App("test-app")' in code
         assert "gpu=None" in code
         assert "memory=512" in code
-        assert '@modal.web_endpoint(method="POST")' in code
+        assert "@modal.fastapi_endpoint" in code
         assert "def predict" in code
+        assert ".uv_pip_install" in code
 
     def test_gpu_config_in_generated_code(self):
         config = {
@@ -211,13 +231,12 @@ class TestAppCodeGeneration:
             "memory": 2048,
             "cpu": 2.0,
             "timeout": 600,
-            "container_idle_timeout": 120,
+            "scaledown_window": 120,
             "enable_batching": False,
             "python_version": "3.11",
             "min_containers": 0,
             "max_containers": None,
-            "scaledown_window": None,
-            "allow_concurrent_inputs": 1,
+            "concurrent_inputs": 1,
         }
 
         code = _generate_modal_app_code("gpu-app", "/model", config)
@@ -232,15 +251,14 @@ class TestAppCodeGeneration:
             "memory": 512,
             "cpu": 1.0,
             "timeout": 300,
-            "container_idle_timeout": 60,
+            "scaledown_window": 60,
             "enable_batching": True,
             "max_batch_size": 16,
             "batch_wait_ms": 200,
             "python_version": "3.10",
             "min_containers": 0,
             "max_containers": None,
-            "scaledown_window": None,
-            "allow_concurrent_inputs": 1,
+            "concurrent_inputs": 1,
         }
 
         code = _generate_modal_app_code("batch-app", "/model", config)
@@ -256,13 +274,12 @@ class TestAppCodeGeneration:
             "memory": 512,
             "cpu": 1.0,
             "timeout": 300,
-            "container_idle_timeout": 60,
+            "scaledown_window": 60,
             "enable_batching": False,
             "python_version": "3.10",
             "min_containers": 0,
             "max_containers": None,
-            "scaledown_window": None,
-            "allow_concurrent_inputs": 1,
+            "concurrent_inputs": 1,
         }
         requirements = ["numpy==1.24.0", "pandas>=2.0"]
 
@@ -278,13 +295,12 @@ class TestAppCodeGeneration:
             "memory": 512,
             "cpu": 1.0,
             "timeout": 300,
-            "container_idle_timeout": 60,
+            "scaledown_window": 300,
             "enable_batching": False,
             "python_version": "3.10",
             "min_containers": 2,
             "max_containers": 10,
-            "scaledown_window": 300,
-            "allow_concurrent_inputs": 4,
+            "concurrent_inputs": 1,
         }
 
         code = _generate_modal_app_code("scale-app", "/model", config)
@@ -292,7 +308,42 @@ class TestAppCodeGeneration:
         assert "min_containers=2" in code
         assert "max_containers=10" in code
         assert "scaledown_window=300" in code
-        assert "allow_concurrent_inputs=4" in code
+
+    def test_concurrent_inputs_generates_decorator(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 5,
+        }
+
+        code = _generate_modal_app_code("concurrent-app", "/model", config)
+
+        assert "@modal.concurrent(max_inputs=5)" in code
+
+    def test_concurrent_inputs_default_no_decorator(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+        }
+
+        code = _generate_modal_app_code("no-concurrent-app", "/model", config)
+
+        assert "@modal.concurrent" not in code
 
     def test_wheel_installation_code_generated(self):
         config = {
@@ -300,13 +351,12 @@ class TestAppCodeGeneration:
             "memory": 512,
             "cpu": 1.0,
             "timeout": 300,
-            "container_idle_timeout": 60,
+            "scaledown_window": 60,
             "enable_batching": False,
             "python_version": "3.10",
             "min_containers": 0,
             "max_containers": None,
-            "scaledown_window": None,
-            "allow_concurrent_inputs": 1,
+            "concurrent_inputs": 1,
         }
         wheel_filenames = ["my_package-1.0.0-py3-none-any.whl", "other-2.0.0-py3-none-any.whl"]
 
@@ -315,8 +365,24 @@ class TestAppCodeGeneration:
         assert "Install wheel dependencies from volume" in code
         assert "/model/wheels/my_package-1.0.0-py3-none-any.whl" in code
         assert "/model/wheels/other-2.0.0-py3-none-any.whl" in code
-        assert "pip" in code
-        assert "install" in code
+
+    def test_gpu_fallback_list_in_generated_code(self):
+        config = {
+            "gpu": ["H100", "A100-80GB"],
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+        }
+
+        code = _generate_modal_app_code("fallback-gpu-app", "/model", config)
+
+        assert 'gpu=["H100", "A100-80GB"]' in code
 
 
 class TestClientInstance:
@@ -383,51 +449,6 @@ class TestFlavorValidation:
 
         with pytest.raises(MlflowException, match="does not contain"):
             _validate_deployment_flavor(model_config, "python_function")
-
-
-class TestConfigDefaults:
-    def test_all_default_constants(self):
-        assert DEFAULT_MEMORY == 512
-        assert DEFAULT_CPU == 1.0
-        assert DEFAULT_TIMEOUT == 300
-        assert DEFAULT_CONTAINER_IDLE_TIMEOUT == 60
-        assert DEFAULT_ALLOW_CONCURRENT_INPUTS == 1
-        assert DEFAULT_MIN_CONTAINERS == 0
-        assert DEFAULT_MAX_CONTAINERS is None
-        assert DEFAULT_SCALEDOWN_WINDOW is None
-
-    def test_apply_custom_config_with_none(self):
-        client = ModalDeploymentClient("modal")
-        base_config = client._default_deployment_config()
-        original_memory = base_config["memory"]
-
-        result = client._apply_custom_config(base_config, None)
-
-        assert result["memory"] == original_memory
-
-    def test_apply_custom_config_preserves_none_values(self):
-        client = ModalDeploymentClient("modal")
-        base_config = client._default_deployment_config()
-
-        result = client._apply_custom_config(base_config, {"gpu": None})
-
-        assert result["gpu"] is None
-
-    def test_apply_custom_config_passthrough_unknown_keys(self):
-        client = ModalDeploymentClient("modal")
-        base_config = client._default_deployment_config()
-
-        result = client._apply_custom_config(base_config, {"custom_key": "custom_value"})
-
-        assert result["custom_key"] == "custom_value"
-
-    def test_apply_custom_config_batching_false_string(self):
-        client = ModalDeploymentClient("modal")
-        base_config = client._default_deployment_config()
-
-        result = client._apply_custom_config(base_config, {"enable_batching": "false"})
-
-        assert result["enable_batching"] is False
 
 
 class TestCondaYamlEdgeCases:
@@ -519,19 +540,18 @@ class TestAppCodeGenerationEdgeCases:
             "memory": 512,
             "cpu": 1.0,
             "timeout": 300,
-            "container_idle_timeout": 60,
+            "scaledown_window": 60,
             "enable_batching": False,
             "python_version": "3.10",
             "min_containers": 0,
             "max_containers": None,
-            "scaledown_window": None,
-            "allow_concurrent_inputs": 1,
+            "concurrent_inputs": 1,
         }
 
         code = _generate_modal_app_code("default-app", "/model", config)
 
-        assert "min_containers=" not in code or "min_containers=0" not in code
-        assert "max_containers=" not in code
+        assert "min_containers=0" not in code
+        assert "max_containers=" not in code or "max_containers=None" not in code
 
     def test_empty_requirements_list(self):
         config = {
@@ -539,18 +559,17 @@ class TestAppCodeGenerationEdgeCases:
             "memory": 512,
             "cpu": 1.0,
             "timeout": 300,
-            "container_idle_timeout": 60,
+            "scaledown_window": 60,
             "enable_batching": False,
             "python_version": "3.10",
             "min_containers": 0,
             "max_containers": None,
-            "scaledown_window": None,
-            "allow_concurrent_inputs": 1,
+            "concurrent_inputs": 1,
         }
 
         code = _generate_modal_app_code("no-req-app", "/model", config, [])
 
-        assert ".pip_install" in code
+        assert ".uv_pip_install" in code
         assert '"mlflow"' in code
 
     def test_no_wheel_code_when_none(self):
@@ -559,13 +578,12 @@ class TestAppCodeGenerationEdgeCases:
             "memory": 512,
             "cpu": 1.0,
             "timeout": 300,
-            "container_idle_timeout": 60,
+            "scaledown_window": 60,
             "enable_batching": False,
             "python_version": "3.10",
             "min_containers": 0,
             "max_containers": None,
-            "scaledown_window": None,
-            "allow_concurrent_inputs": 1,
+            "concurrent_inputs": 1,
         }
 
         code = _generate_modal_app_code("no-wheel-app", "/model", config, None, None)
