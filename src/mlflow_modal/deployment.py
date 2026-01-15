@@ -709,7 +709,7 @@ def target_help() -> str:
 
     Installation
     ------------
-    pip install mlflow-modal
+    pip install mlflow-modal-deploy
 
     Target URI Format
     -----------------

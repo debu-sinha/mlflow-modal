@@ -26,7 +26,7 @@ from mlflow_modal.deployment import (
 class TestModuleExports:
     def test_version_exported(self):
         assert hasattr(mlflow_modal, "__version__")
-        assert mlflow_modal.__version__ == "0.1.0"
+        assert mlflow_modal.__version__ == "0.2.2"
 
     def test_client_exported(self):
         assert hasattr(mlflow_modal, "ModalDeploymentClient")
@@ -504,7 +504,7 @@ class TestTargetHelp:
         assert "modal" in result.lower()
         assert "gpu" in result.lower()
         assert "memory" in result.lower()
-        assert "pip install mlflow-modal" in result
+        assert "pip install mlflow-modal-deploy" in result
 
     def test_target_help_contains_examples(self):
         result = target_help()
