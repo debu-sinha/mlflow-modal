@@ -33,9 +33,7 @@ def train_and_log_model():
     """Train a simple model and log to MLflow."""
     print("Training model...")
     iris = load_iris()
-    X_train, _, y_train, _ = train_test_split(
-        iris.data, iris.target, test_size=0.2, random_state=42
-    )
+    X_train, _, y_train, _ = train_test_split(iris.data, iris.target, test_size=0.2, random_state=42)
     model = RandomForestClassifier(n_estimators=5, random_state=42)
     model.fit(X_train, y_train)
 
@@ -91,29 +89,30 @@ def test_basic_deployment(run_id: str) -> bool:
             },
         )
 
-        print(f"  Deployment successful!")
+        print("  Deployment successful!")
         print(f"  Endpoint URL: {deployment.get('endpoint_url')}")
 
         # Verify config
         config = deployment.get("config", {})
         assert config.get("extra_pip_packages") == ["structlog>=24.0"]
-        print(f"  extra_pip_packages correctly set")
+        print("  extra_pip_packages correctly set")
 
         # Make prediction
         endpoint_url = deployment.get("endpoint_url")
         if endpoint_url:
-            print(f"  Testing prediction...")
+            print("  Testing prediction...")
             result = make_prediction(endpoint_url)
             if result:
                 print(f"  Prediction successful: {result}")
             else:
-                print(f"  Prediction timed out, but deployment was created")
+                print("  Prediction timed out, but deployment was created")
 
         return True
 
     except Exception as e:
         print(f"  FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -146,16 +145,16 @@ def test_pip_index_url(run_id: str) -> bool:
             },
         )
 
-        print(f"  Deployment successful!")
+        print("  Deployment successful!")
         print(f"  Endpoint URL: {deployment.get('endpoint_url')}")
 
         config = deployment.get("config", {})
         assert config.get("pip_index_url") == "https://pypi.org/simple/"
-        print(f"  pip_index_url correctly set")
+        print("  pip_index_url correctly set")
 
         endpoint_url = deployment.get("endpoint_url")
         if endpoint_url:
-            print(f"  Testing prediction...")
+            print("  Testing prediction...")
             result = make_prediction(endpoint_url)
             if result:
                 print(f"  Prediction successful: {result}")
@@ -165,6 +164,7 @@ def test_pip_index_url(run_id: str) -> bool:
     except Exception as e:
         print(f"  FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -197,18 +197,19 @@ def test_pip_extra_index_url(run_id: str) -> bool:
             },
         )
 
-        print(f"  Deployment successful!")
+        print("  Deployment successful!")
         print(f"  Endpoint URL: {deployment.get('endpoint_url')}")
 
         config = deployment.get("config", {})
         assert config.get("pip_extra_index_url") == "https://pypi.org/simple/"
-        print(f"  pip_extra_index_url correctly set")
+        print("  pip_extra_index_url correctly set")
 
         return True
 
     except Exception as e:
         print(f"  FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -232,7 +233,10 @@ def test_modal_secret(run_id: str) -> bool:
 
     result = subprocess.run(
         [
-            "modal", "secret", "create", secret_name,
+            "modal",
+            "secret",
+            "create",
+            secret_name,
             "PIP_EXTRA_INDEX_URL=https://pypi.org/simple/",
             "--force",
         ],
@@ -243,7 +247,7 @@ def test_modal_secret(run_id: str) -> bool:
     if result.returncode != 0:
         print(f"  Warning: Could not create secret: {result.stderr}")
     else:
-        print(f"  Secret created")
+        print("  Secret created")
 
     client = get_deploy_client("modal")
     deployment_name = "e2e-test-modal-secret"
@@ -260,16 +264,16 @@ def test_modal_secret(run_id: str) -> bool:
             },
         )
 
-        print(f"  Deployment successful!")
+        print("  Deployment successful!")
         print(f"  Endpoint URL: {deployment.get('endpoint_url')}")
 
         config = deployment.get("config", {})
         assert config.get("modal_secret") == secret_name
-        print(f"  modal_secret correctly set")
+        print("  modal_secret correctly set")
 
         endpoint_url = deployment.get("endpoint_url")
         if endpoint_url:
-            print(f"  Testing prediction...")
+            print("  Testing prediction...")
             result = make_prediction(endpoint_url)
             if result:
                 print(f"  Prediction successful: {result}")
@@ -279,6 +283,7 @@ def test_modal_secret(run_id: str) -> bool:
     except Exception as e:
         print(f"  FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

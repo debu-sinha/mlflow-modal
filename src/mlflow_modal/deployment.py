@@ -572,9 +572,7 @@ class ModalDeploymentClient(BaseDeploymentClient):
                 _logger.info(f"Detected wheel files: {[os.path.basename(w) for w in wheel_files]}")
 
             wheel_filenames = [os.path.basename(w) for w in wheel_files] if wheel_files else None
-            app_code = _generate_modal_app_code(
-                name, deployment_config, model_requirements, wheel_filenames
-            )
+            app_code = _generate_modal_app_code(name, deployment_config, model_requirements, wheel_filenames)
 
             app_file = os.path.join(tmp_dir.path(), "modal_app.py")
             with open(app_file, "w") as f:
@@ -823,9 +821,7 @@ def run_local(
             _logger.info(f"Detected wheel files: {[os.path.basename(w) for w in wheel_files]}")
 
         wheel_filenames = [os.path.basename(w) for w in wheel_files] if wheel_files else None
-        app_code = _generate_modal_app_code(
-            name, deployment_config, model_requirements, wheel_filenames
-        )
+        app_code = _generate_modal_app_code(name, deployment_config, model_requirements, wheel_filenames)
 
         app_file = os.path.join(tmp_dir.path(), "modal_app.py")
         with open(app_file, "w") as f:
