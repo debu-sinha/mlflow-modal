@@ -17,7 +17,7 @@ pip install mlflow-modal-deploy
 ## Features
 
 - **One-command deployment**: Deploy any MLflow model to Modal's serverless infrastructure
-- **GPU support**: T4, L4, A10G, A100, A100-80GB, H100
+- **GPU support**: T4, L4, L40S, A10, A100, A100-40GB, A100-80GB, H100, H200, B200
 - **Auto-scaling**: Configure min/max containers, scale-down windows
 - **Dynamic batching**: Built-in request batching for high-throughput workloads
 - **Automatic dependency detection**: Extracts requirements from model artifacts
@@ -78,11 +78,12 @@ mlflow deployments delete -t modal --name my-model
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `gpu` | str | None | GPU type: T4, L4, A10G, A100, A100-80GB, H100 |
+| `gpu` | str/list | None | GPU type (T4, L4, L40S, A10, A100, A100-40GB, A100-80GB, H100, H200, B200), multi-GPU (`H100:8`), or fallback list (`["H100", "A100"]`) |
 | `memory` | int | 512 | Memory allocation in MB |
 | `cpu` | float | 1.0 | CPU cores |
 | `timeout` | int | 300 | Request timeout in seconds |
-| `container_idle_timeout` | int | 60 | Container idle timeout in seconds |
+| `scaledown_window` | int | 60 | Seconds before idle container scales down |
+| `concurrent_inputs` | int | 1 | Max concurrent requests per container |
 | `min_containers` | int | 0 | Minimum warm containers |
 | `max_containers` | int | None | Maximum containers |
 | `enable_batching` | bool | False | Enable dynamic batching |
@@ -167,7 +168,7 @@ run_local(
 
 - Python 3.10+
 - MLflow 2.10.0+
-- Modal 0.64.0+
+- Modal 1.0.0+
 
 ## Contributing
 
