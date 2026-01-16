@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-01-16
+
+### Security
+- Add deployment name validation to prevent code injection attacks
+- Add URL/string escaping in generated code to prevent injection via `pip_index_url`, `pip_extra_index_url`, or `modal_secret`
+- Add input validation for `predict()` method
+
+### Added
+- Weekly API compatibility monitoring workflow (tests against latest Modal/MLflow)
+- 9 new security tests (92 total)
+
 ## [0.5.0] - 2026-01-16
 
 ### Added
@@ -121,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full MLflow CLI integration (`mlflow deployments` commands)
 - Workspace targeting via URI (`modal:/workspace-name`)
 
-[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.0...v0.3.1
