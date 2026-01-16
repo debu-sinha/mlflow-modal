@@ -9,6 +9,8 @@
 
 Deploy MLflow models to [Modal](https://modal.com)'s serverless GPU infrastructure with a single command.
 
+> **If you find this project useful, please consider giving it a ⭐!** It helps others discover the project and motivates continued development. Using it in production? [Share your experience](https://github.com/debu-sinha/mlflow-modal-deploy/issues) - we'd love to hear from you!
+
 ## Installation
 
 ```bash
