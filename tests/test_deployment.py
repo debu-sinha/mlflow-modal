@@ -919,7 +919,7 @@ class TestStreamingEndpointGeneration:
         assert "def predict_stream" in code
         assert "StreamingResponse" in code
         assert "text/event-stream" in code
-        assert 'data: [DONE]' in code
+        assert "data: [DONE]" in code
 
     def test_streaming_endpoint_with_batching(self):
         config = {

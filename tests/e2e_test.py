@@ -366,6 +366,7 @@ def test_streaming(run_id: str) -> bool:
             # This might fail if the model doesn't support streaming natively
             # but the endpoint should still return a single chunk with predictions
             import traceback
+
             traceback.print_exc()
 
         if chunks:
@@ -380,6 +381,7 @@ def test_streaming(run_id: str) -> bool:
             # Try direct HTTP request to streaming endpoint for debugging
             print("  Attempting direct HTTP request to streaming endpoint...")
             import requests
+
             # Handle both URL patterns: path-based (/predict) and subdomain-based (-predict.)
             if "/predict" in endpoint_url:
                 stream_url = endpoint_url.replace("/predict", "/predict_stream")
@@ -409,6 +411,7 @@ def test_streaming(run_id: str) -> bool:
     except Exception as e:
         print(f"  FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
