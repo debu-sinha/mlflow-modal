@@ -1,0 +1,84 @@
+name: API Compatibility
+
+on:
+  schedule:
+    # Run every Sunday at midnight UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  test-latest:
+    name: Test with latest dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install latest dependencies
+        run: |
+          pip install --upgrade pip
+          pip install modal@latest mlflow@latest
+          pip install -e ".[dev]"
+
+      - name: Show versions
+        run: |
+          echo "Modal version: $(pip show modal | grep Version)"
+          echo "MLflow version: $(pip show mlflow | grep Version)"
+
+      - name: Run tests
+        id: tests
+        run: |
+          pytest tests/test_deployment.py -v --tb=short
+        continue-on-error: true
+
+      - name: Create issue on failure
+        if: steps.tests.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `API Compatibility: Tests failing with latest Modal/MLflow`;
+            const body = `## Weekly API Compatibility Check Failed
+
+            Tests are failing against the latest versions of Modal and MLflow.
+
+            **Action Required:** Review the [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) and update the code if needed.
+
+            This may indicate:
+            - Breaking changes in Modal SDK
+            - Breaking changes in MLflow deployment API
+            - New deprecation warnings becoming errors
+
+            ### Next Steps
+            1. Check the [Modal Changelog](https://modal.com/docs/reference/changelog)
+            2. Check the [MLflow Releases](https://github.com/mlflow/mlflow/releases)
+            3. Update code to fix compatibility issues
+            `;
+
+            // Check if similar issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'api-compatibility'
+            });
+
+            const existingIssue = issues.data.find(i => i.title.includes('API Compatibility'));
+
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['api-compatibility', 'bug']
+              });
+            }
+
+      - name: Fail if tests failed
+        if: steps.tests.outcome == 'failure'
+        run: exit 1
