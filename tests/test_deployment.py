@@ -609,6 +609,18 @@ class TestTargetHelp:
         assert "get_deploy_client" in result
         assert "create_deployment" in result
 
+    def test_target_help_contains_streaming_docs(self):
+        result = target_help()
+        assert "predict_stream" in result
+        assert "Streaming" in result
+
+    def test_target_help_contains_private_pypi_docs(self):
+        result = target_help()
+        assert "pip_index_url" in result
+        assert "pip_extra_index_url" in result
+        assert "modal_secret" in result
+        assert "extra_pip_packages" in result
+
 
 class TestAppCodeGenerationEdgeCases:
     def test_no_scaling_config_when_defaults(self):
@@ -883,3 +895,230 @@ class TestSecurityValidation:
         # The escaped string should be safe when used in f'index_url="{escaped}"'
         # because the quotes are escaped as \"
         assert escaped == 'https://evil.com\\"); import os; os.system(\\"rm -rf /'
+
+
+class TestStreamingEndpointGeneration:
+    """Tests for streaming endpoint in generated Modal app code."""
+
+    def test_streaming_endpoint_generated(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+        }
+
+        code = _generate_modal_app_code("stream-app", config)
+
+        assert "def predict_stream" in code
+        assert "StreamingResponse" in code
+        assert "text/event-stream" in code
+        assert 'data: [DONE]' in code
+
+    def test_streaming_endpoint_with_batching(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": True,
+            "max_batch_size": 8,
+            "batch_wait_ms": 100,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+        }
+
+        code = _generate_modal_app_code("batch-stream-app", config)
+
+        # Both regular and streaming endpoints should be present
+        assert "def predict" in code
+        assert "def predict_stream" in code
+        assert "@modal.batched" in code
+
+    def test_streaming_endpoint_checks_model_capability(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+        }
+
+        code = _generate_modal_app_code("stream-check-app", config)
+
+        # Should check for model's predict_stream capability
+        assert "hasattr(self.model, 'predict_stream')" in code
+
+
+class TestPredictStreamMethod:
+    """Tests for predict_stream() method on ModalDeploymentClient."""
+
+    def test_predict_stream_requires_deployment_name(self):
+        from mlflow.exceptions import MlflowException
+
+        client = ModalDeploymentClient("modal")
+
+        with pytest.raises(MlflowException, match="deployment_name is required"):
+            list(client.predict_stream(deployment_name=None, inputs={"test": "data"}))
+
+    def test_predict_stream_requires_inputs(self):
+        from mlflow.exceptions import MlflowException
+
+        client = ModalDeploymentClient("modal")
+
+        with pytest.raises(MlflowException, match="inputs is required"):
+            list(client.predict_stream(deployment_name="test-model", inputs=None))
+
+    def test_predict_stream_url_construction_from_predict_url(self):
+        from unittest.mock import MagicMock, patch
+
+        client = ModalDeploymentClient("modal")
+
+        # Mock get_deployment to return a URL
+        mock_deployment = {"endpoint_url": "https://test--app.modal.run/predict"}
+
+        with patch.object(client, "get_deployment", return_value=mock_deployment):
+            with patch("requests.post") as mock_post:
+                # Mock streaming response
+                mock_response = MagicMock()
+                mock_response.iter_lines.return_value = [b"data: [DONE]"]
+                mock_response.__enter__ = MagicMock(return_value=mock_response)
+                mock_response.__exit__ = MagicMock(return_value=False)
+                mock_post.return_value = mock_response
+
+                # Consume the generator
+                list(client.predict_stream(deployment_name="test", inputs={"test": "data"}))
+
+                # Verify URL was constructed correctly
+                mock_post.assert_called_once()
+                call_args = mock_post.call_args
+                assert call_args[0][0] == "https://test--app.modal.run/predict_stream"
+
+    def test_predict_stream_parses_sse_format(self):
+        from unittest.mock import MagicMock, patch
+
+        client = ModalDeploymentClient("modal")
+
+        mock_deployment = {"endpoint_url": "https://test--app.modal.run/predict"}
+
+        with patch.object(client, "get_deployment", return_value=mock_deployment):
+            with patch("requests.post") as mock_post:
+                # Mock streaming response with SSE data
+                mock_response = MagicMock()
+                mock_response.iter_lines.return_value = [
+                    b'data: {"chunk": 1, "text": "Hello"}',
+                    b'data: {"chunk": 2, "text": " World"}',
+                    b"data: [DONE]",
+                ]
+                mock_response.__enter__ = MagicMock(return_value=mock_response)
+                mock_response.__exit__ = MagicMock(return_value=False)
+                mock_post.return_value = mock_response
+
+                # Collect results
+                results = list(client.predict_stream(deployment_name="test", inputs={"prompt": "Hi"}))
+
+                assert len(results) == 2
+                assert results[0] == {"chunk": 1, "text": "Hello"}
+                assert results[1] == {"chunk": 2, "text": " World"}
+
+    def test_predict_stream_skips_empty_lines(self):
+        from unittest.mock import MagicMock, patch
+
+        client = ModalDeploymentClient("modal")
+
+        mock_deployment = {"endpoint_url": "https://test--app.modal.run/predict"}
+
+        with patch.object(client, "get_deployment", return_value=mock_deployment):
+            with patch("requests.post") as mock_post:
+                mock_response = MagicMock()
+                mock_response.iter_lines.return_value = [
+                    b"",  # Empty line
+                    b'data: {"text": "test"}',
+                    b"",  # Another empty line
+                    b"data: [DONE]",
+                ]
+                mock_response.__enter__ = MagicMock(return_value=mock_response)
+                mock_response.__exit__ = MagicMock(return_value=False)
+                mock_post.return_value = mock_response
+
+                results = list(client.predict_stream(deployment_name="test", inputs={"test": "data"}))
+
+                assert len(results) == 1
+                assert results[0] == {"text": "test"}
+
+    def test_predict_stream_skips_non_data_lines(self):
+        from unittest.mock import MagicMock, patch
+
+        client = ModalDeploymentClient("modal")
+
+        mock_deployment = {"endpoint_url": "https://test--app.modal.run/predict"}
+
+        with patch.object(client, "get_deployment", return_value=mock_deployment):
+            with patch("requests.post") as mock_post:
+                mock_response = MagicMock()
+                mock_response.iter_lines.return_value = [
+                    b"event: message",  # Non-data line
+                    b'data: {"text": "test"}',
+                    b"id: 123",  # Another non-data line
+                    b"data: [DONE]",
+                ]
+                mock_response.__enter__ = MagicMock(return_value=mock_response)
+                mock_response.__exit__ = MagicMock(return_value=False)
+                mock_post.return_value = mock_response
+
+                results = list(client.predict_stream(deployment_name="test", inputs={"test": "data"}))
+
+                assert len(results) == 1
+                assert results[0] == {"text": "test"}
+
+    def test_predict_stream_sends_correct_headers(self):
+        from unittest.mock import MagicMock, patch
+
+        client = ModalDeploymentClient("modal")
+
+        mock_deployment = {"endpoint_url": "https://test--app.modal.run/predict"}
+
+        with patch.object(client, "get_deployment", return_value=mock_deployment):
+            with patch("requests.post") as mock_post:
+                mock_response = MagicMock()
+                mock_response.iter_lines.return_value = [b"data: [DONE]"]
+                mock_response.__enter__ = MagicMock(return_value=mock_response)
+                mock_response.__exit__ = MagicMock(return_value=False)
+                mock_post.return_value = mock_response
+
+                list(client.predict_stream(deployment_name="test", inputs={"test": "data"}))
+
+                call_kwargs = mock_post.call_args[1]
+                assert call_kwargs["headers"]["Accept"] == "text/event-stream"
+                assert call_kwargs["stream"] is True
+
+    def test_predict_stream_raises_on_missing_endpoint(self):
+        from unittest.mock import patch
+
+        from mlflow.exceptions import MlflowException
+
+        client = ModalDeploymentClient("modal")
+
+        # Mock get_deployment to return no endpoint URL
+        mock_deployment = {"endpoint_url": None}
+
+        with (
+            patch.object(client, "get_deployment", return_value=mock_deployment),
+            patch.object(client, "_get_modal_workspace", return_value=None),
+        ):
+            with pytest.raises(MlflowException, match="Could not find streaming endpoint"):
+                list(client.predict_stream(deployment_name="test", inputs={"test": "data"}))

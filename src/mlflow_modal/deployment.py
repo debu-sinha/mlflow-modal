@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import urllib.parse
+from collections.abc import Iterator
 from typing import Any
 
 import requests
@@ -374,6 +375,35 @@ image = (
         return {"predictions": prediction.tolist()}
 """
 
+    # Add streaming endpoint for LLM-style models
+    code += """
+    @modal.fastapi_endpoint(method="POST")
+    def predict_stream(self, input_data: dict):
+        from fastapi.responses import StreamingResponse
+        import json
+
+        def generate():
+            # Try streaming prediction first, fall back to regular prediction
+            try:
+                if hasattr(self.model, 'predict_stream'):
+                    for chunk in self.model.predict_stream(input_data):
+                        yield f"data: {json.dumps(chunk)}\\n\\n"
+                    yield "data: [DONE]\\n\\n"
+                    return
+            except Exception:
+                # Model doesn't support streaming, fall back to regular prediction
+                pass
+
+            # Fall back to regular prediction for non-streaming models
+            import pandas as pd
+            df = pd.DataFrame(input_data)
+            prediction = self.model.predict(df)
+            yield f"data: {json.dumps({'predictions': prediction.tolist()})}\\n\\n"
+            yield "data: [DONE]\\n\\n"
+
+        return StreamingResponse(generate(), media_type="text/event-stream")
+"""
+
     return code
 
 
@@ -418,6 +448,27 @@ class ModalDeploymentClient(BaseDeploymentClient):
     def _validate_modal_auth(self):
         """Validate that Modal authentication is configured."""
         _import_modal()
+
+    def _get_modal_workspace(self) -> str | None:
+        """Get the current Modal workspace/username."""
+        result = subprocess.run(
+            ["modal", "profile", "current"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        return None
+
+    def _construct_endpoint_url(self, deployment_name: str, method: str = "predict") -> str | None:
+        """Construct endpoint URL from Modal naming convention."""
+        workspace = self.workspace or self._get_modal_workspace()
+        if not workspace:
+            return None
+        # Modal URL pattern: https://{workspace}--{app-name}-mlflowmodel-{method}.modal.run
+        # Note: underscores in method names become hyphens
+        method_slug = method.replace("_", "-")
+        return f"https://{workspace}--{deployment_name}-mlflowmodel-{method_slug}.modal.run"
 
     def _default_deployment_config(self) -> dict[str, Any]:
         """Return default deployment configuration."""
@@ -642,12 +693,20 @@ class ModalDeploymentClient(BaseDeploymentClient):
                 )
 
             endpoint_url = None
+            streaming_url = None
             for line in result.stdout.split("\n"):
                 if "https://" in line and ".modal.run" in line:
                     match = re.search(r"(https://[^\s]+\.modal\.run[^\s]*)", line)
                     if match:
-                        endpoint_url = match.group(1)
-                        break
+                        url = match.group(1)
+                        # Prefer the regular predict endpoint over streaming
+                        if "-predict-stream." in url or "/predict_stream" in url:
+                            streaming_url = url
+                        elif "-predict." in url or "/predict" in url or endpoint_url is None:
+                            endpoint_url = url
+            # Fall back to streaming URL if no regular predict URL found
+            if endpoint_url is None:
+                endpoint_url = streaming_url
 
             return {
                 "name": name,
@@ -718,7 +777,15 @@ class ModalDeploymentClient(BaseDeploymentClient):
         except json.JSONDecodeError:
             apps = []
 
-        return [{"name": app.get("name", app.get("app_id", "unknown"))} for app in apps]
+        # Modal JSON uses "Description" for app name and "App ID" for ID
+        return [
+            {
+                "name": app.get("Description", app.get("name", app.get("App ID", "unknown"))),
+                "app_id": app.get("App ID", app.get("app_id")),
+                "state": app.get("State", app.get("state")),
+            }
+            for app in apps
+        ]
 
     def get_deployment(self, name: str, endpoint: str | None = None) -> dict[str, Any]:
         """Get information about a specific Modal deployment."""
@@ -754,22 +821,8 @@ class ModalDeploymentClient(BaseDeploymentClient):
         endpoint_url = deployment.get("endpoint_url")
 
         if not endpoint_url:
-            list_cmd = ["modal", "app", "list", "--json"]
-            if self.workspace:
-                list_cmd.extend(["--env", self.workspace])
-
-            result = subprocess.run(list_cmd, capture_output=True, text=True)
-            if result.returncode == 0:
-                try:
-                    apps = json.loads(result.stdout) if result.stdout.strip() else []
-                    for app in apps:
-                        if app.get("name") == deployment_name or app.get("app_id") == deployment_name:
-                            for func in app.get("functions", []):
-                                if "predict" in func.get("name", "").lower():
-                                    endpoint_url = func.get("web_url")
-                                    break
-                except json.JSONDecodeError:
-                    pass
+            # Construct URL from Modal naming convention
+            endpoint_url = self._construct_endpoint_url(deployment_name, "predict")
 
         if not endpoint_url:
             raise MlflowException(
@@ -782,6 +835,107 @@ class ModalDeploymentClient(BaseDeploymentClient):
         response.raise_for_status()
 
         return PredictionsResponse(predictions=response.json())
+
+    def predict_stream(
+        self,
+        deployment_name: str | None = None,
+        inputs: dict[str, Any] | None = None,
+        endpoint: str | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """
+        Stream predictions from a deployed Modal model.
+
+        This method is compatible with the MLflow Databricks client API,
+        enabling consistent streaming across deployment targets.
+
+        Args:
+            deployment_name: Name of the deployment to query.
+            inputs: The inputs to the query, as a dictionary.
+            endpoint: Unused, kept for API compatibility.
+
+        Returns:
+            An iterator of dictionaries containing streamed response chunks.
+
+        Example:
+            .. code-block:: python
+
+                from mlflow.deployments import get_deploy_client
+
+                client = get_deploy_client("modal")
+                for chunk in client.predict_stream(
+                    deployment_name="my-llm-model",
+                    inputs={
+                        "messages": [{"role": "user", "content": "Hello!"}],
+                        "temperature": 0.7,
+                        "max_tokens": 100,
+                    },
+                ):
+                    print(chunk)
+                    # Example chunk:
+                    # {"choices": [{"delta": {"content": "Hi"}, "index": 0}]}
+        """
+        if deployment_name is None:
+            raise MlflowException(
+                "deployment_name is required",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+        if inputs is None:
+            raise MlflowException(
+                "inputs is required for prediction",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        deployment = self.get_deployment(deployment_name)
+        endpoint_url = deployment.get("endpoint_url")
+
+        # Construct streaming endpoint URL
+        stream_url = None
+        if endpoint_url:
+            # Handle both URL patterns:
+            # 1. Path-based: https://host/predict -> https://host/predict_stream
+            # 2. Subdomain-based: https://x--y-predict.modal.run -> https://x--y-predict-stream.modal.run
+            if "/predict" in endpoint_url:
+                stream_url = endpoint_url.replace("/predict", "/predict_stream")
+            else:
+                stream_url = endpoint_url.replace("-predict.", "-predict-stream.")
+        else:
+            # Construct URL from Modal naming convention
+            stream_url = self._construct_endpoint_url(deployment_name, "predict_stream")
+
+        if not stream_url:
+            raise MlflowException(
+                f"Could not find streaming endpoint URL for deployment '{deployment_name}'. "
+                "The deployment may not have a streaming endpoint configured.",
+                error_code=RESOURCE_DOES_NOT_EXIST,
+            )
+
+        # Make streaming request
+        with requests.post(
+            stream_url,
+            json=inputs,
+            stream=True,
+            headers={"Accept": "text/event-stream"},
+            timeout=300,
+        ) as response:
+            response.raise_for_status()
+
+            for line in response.iter_lines():
+                if not line:
+                    continue
+
+                line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+
+                # Parse SSE format: "data: <json>"
+                if not line_str.startswith("data:"):
+                    continue
+
+                data = line_str[5:].strip()  # Remove "data:" prefix
+
+                # Check for end of stream
+                if data == "[DONE]":
+                    return
+
+                yield json.loads(data)
 
 
 def run_local(
@@ -876,6 +1030,12 @@ def target_help() -> str:
     - ``max_batch_size``: Maximum batch size when batching enabled (default: 8)
     - ``batch_wait_ms``: Batch wait time in milliseconds (default: 100)
 
+    Private PyPI Configuration:
+    - ``extra_pip_packages``: Additional pip packages to install
+    - ``pip_index_url``: Custom PyPI index URL for private packages
+    - ``pip_extra_index_url``: Additional PyPI index URL
+    - ``modal_secret``: Modal secret name containing PyPI credentials
+
     Example
     -------
     .. code-block:: python
@@ -899,6 +1059,17 @@ def target_help() -> str:
             deployment_name="my-classifier",
             inputs={"feature1": [1, 2, 3], "feature2": [4, 5, 6]}
         )
+
+    Streaming (for LLM models)
+    --------------------------
+    .. code-block:: python
+
+        # Stream responses for LLM deployments (compatible with Databricks API)
+        for chunk in client.predict_stream(
+            deployment_name="my-llm",
+            inputs={"messages": [{"role": "user", "content": "Hello!"}]}
+        ):
+            print(chunk.get("text", ""), end="", flush=True)
 
     CLI Usage
     ---------

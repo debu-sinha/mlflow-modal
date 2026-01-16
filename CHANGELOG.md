@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-01-16
+
+### Added
+- `predict_stream()` method for streaming predictions (compatible with MLflow Databricks client API)
+- Streaming endpoint (`/predict_stream`) in generated Modal apps with Server-Sent Events (SSE) support
+- Automatic model capability detection for streaming (falls back to regular prediction for non-streaming models)
+- Helper methods `_get_modal_workspace()` and `_construct_endpoint_url()` for robust endpoint URL resolution
+- 13 new tests for streaming functionality (105 total)
+
+### Fixed
+- Fixed endpoint URL parsing to prefer regular `predict` endpoint over `predict_stream` in deployment output
+- Fixed Modal JSON key parsing (`"Description"` and `"App ID"` instead of `"name"` and `"app_id"`)
+- Fixed streaming URL construction to handle both path-based and subdomain-based Modal URL patterns
+
 ## [0.5.1] - 2026-01-16
 
 ### Security
@@ -132,7 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full MLflow CLI integration (`mlflow deployments` commands)
 - Workspace targeting via URI (`modal:/workspace-name`)
 
-[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.1...v0.4.0

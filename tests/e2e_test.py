@@ -7,6 +7,7 @@ These tests deploy real models to Modal and verify:
 2. pip_index_url configuration
 3. pip_extra_index_url configuration
 4. modal_secret integration
+5. Streaming predictions via predict_stream()
 
 Prerequisites:
     - Modal authentication configured (modal setup)
@@ -15,6 +16,7 @@ Prerequisites:
 Usage:
     python tests/e2e_test.py              # Run all tests
     python tests/e2e_test.py --quick      # Run quick test only (basic deployment)
+    python tests/e2e_test.py --stream     # Run streaming test only
 """
 
 import argparse
@@ -302,9 +304,126 @@ def test_modal_secret(run_id: str) -> bool:
         print(f"  Cleaned up secret: {secret_name}")
 
 
+def test_streaming(run_id: str) -> bool:
+    """Test streaming predictions via predict_stream()."""
+    print("\n" + "=" * 60)
+    print("TEST: Streaming predictions (predict_stream)")
+    print("=" * 60)
+
+    client = get_deploy_client("modal")
+    deployment_name = "e2e-test-streaming"
+
+    try:
+        deployment = client.create_deployment(
+            name=deployment_name,
+            model_uri=f"runs:/{run_id}/model",
+            config={
+                "memory": 1024,
+                "timeout": 120,
+                "scaledown_window": 60,
+            },
+        )
+
+        print("  Deployment successful!")
+        endpoint_url = deployment.get("endpoint_url")
+        print(f"  Endpoint URL: {endpoint_url}")
+
+        if not endpoint_url:
+            print("  ERROR: No endpoint URL returned")
+            return False
+
+        # Test regular predict first
+        print("  Testing regular predict()...")
+        sample_data = {
+            "sepal length (cm)": [5.1],
+            "sepal width (cm)": [3.5],
+            "petal length (cm)": [1.4],
+            "petal width (cm)": [0.2],
+        }
+
+        # Wait for cold start
+        print("  Waiting for container to warm up...")
+        time.sleep(10)
+
+        result = make_prediction(endpoint_url)
+        if result:
+            print(f"  Regular predict() successful: {result}")
+        else:
+            print("  Regular predict() timed out, continuing with stream test...")
+
+        # Test streaming predict
+        print("  Testing predict_stream()...")
+        chunks = []
+        try:
+            for chunk in client.predict_stream(
+                deployment_name=deployment_name,
+                inputs=sample_data,
+            ):
+                chunks.append(chunk)
+                print(f"    Received chunk: {chunk}")
+        except Exception as e:
+            print(f"  predict_stream() error: {e}")
+            # This might fail if the model doesn't support streaming natively
+            # but the endpoint should still return a single chunk with predictions
+            import traceback
+            traceback.print_exc()
+
+        if chunks:
+            print(f"  Streaming successful! Received {len(chunks)} chunk(s)")
+            # Verify the chunk contains predictions
+            last_chunk = chunks[-1]
+            if "predictions" in last_chunk:
+                print(f"  Predictions: {last_chunk['predictions']}")
+            return True
+        else:
+            print("  No chunks received from streaming endpoint")
+            # Try direct HTTP request to streaming endpoint for debugging
+            print("  Attempting direct HTTP request to streaming endpoint...")
+            import requests
+            # Handle both URL patterns: path-based (/predict) and subdomain-based (-predict.)
+            if "/predict" in endpoint_url:
+                stream_url = endpoint_url.replace("/predict", "/predict_stream")
+            else:
+                stream_url = endpoint_url.replace("-predict.", "-predict-stream.")
+            try:
+                with requests.post(
+                    stream_url,
+                    json=sample_data,
+                    stream=True,
+                    headers={"Accept": "text/event-stream"},
+                    timeout=180,
+                ) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if line:
+                            print(f"    Raw line: {line}")
+                            chunks.append(line)
+                if chunks:
+                    print(f"  Direct streaming successful! Received {len(chunks)} line(s)")
+                    return True
+            except Exception as e:
+                print(f"  Direct streaming failed: {e}")
+
+            return False
+
+    except Exception as e:
+        print(f"  FAILED: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    finally:
+        try:
+            client.delete_deployment(deployment_name)
+            print(f"  Cleaned up: {deployment_name}")
+        except Exception:
+            pass
+
+
 def main():
     parser = argparse.ArgumentParser(description="E2E tests for mlflow-modal-deploy")
     parser.add_argument("--quick", action="store_true", help="Run quick test only")
+    parser.add_argument("--stream", action="store_true", help="Run streaming test only")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -317,8 +436,11 @@ def main():
 
     if args.quick:
         results["basic_deployment"] = test_basic_deployment(run_id)
+    elif args.stream:
+        results["streaming"] = test_streaming(run_id)
     else:
         results["basic_deployment"] = test_basic_deployment(run_id)
+        results["streaming"] = test_streaming(run_id)
         results["pip_index_url"] = test_pip_index_url(run_id)
         results["pip_extra_index_url"] = test_pip_extra_index_url(run_id)
         results["modal_secret"] = test_modal_secret(run_id)

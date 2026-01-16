@@ -18,10 +18,12 @@ pip install mlflow-modal-deploy
 
 - **One-command deployment**: Deploy any MLflow model to Modal's serverless infrastructure
 - **GPU support**: T4, L4, L40S, A10, A100, A100-40GB, A100-80GB, H100, H200, B200
+- **Streaming predictions**: `predict_stream()` API compatible with MLflow Databricks client
 - **Auto-scaling**: Configure min/max containers, scale-down windows
 - **Dynamic batching**: Built-in request batching for high-throughput workloads
 - **Automatic dependency detection**: Extracts requirements from model artifacts
 - **Wheel file support**: Handles private dependencies packaged as wheel files
+- **Private PyPI support**: Deploy with private packages via `pip_index_url` or Modal secrets
 - **MLflow CLI integration**: Use familiar `mlflow deployments` commands
 
 ## Quick Start
@@ -112,6 +114,32 @@ export MODAL_TOKEN_SECRET=your-token-secret
 ```
 
 ## Advanced Usage
+
+### Streaming Predictions
+
+For LLM and generative models, use `predict_stream()` for token-by-token streaming responses. This API is compatible with MLflow's Databricks client, enabling consistent code across deployment targets.
+
+```python
+from mlflow.deployments import get_deploy_client
+
+client = get_deploy_client("modal")
+
+# Stream predictions (for LLM models)
+for chunk in client.predict_stream(
+    deployment_name="my-llm",
+    inputs={
+        "messages": [{"role": "user", "content": "Hello!"}],
+        "temperature": 0.7,
+        "max_tokens": 100,
+    },
+):
+    print(chunk, end="", flush=True)
+```
+
+**How it works:**
+- Models with native `predict_stream()` support (LLMs) stream token-by-token
+- Non-streaming models (sklearn, XGBoost, etc.) return predictions in a single chunk
+- Uses Server-Sent Events (SSE) format for efficient streaming over HTTP
 
 ### Deploy to Specific Workspace
 
