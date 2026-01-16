@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-01-16
+
+### Added
+- `extra_pip_packages` config option for specifying additional pip packages at deployment time
+- Private PyPI server support via `pip_index_url` and `pip_extra_index_url` config options
+- Modal secret integration via `modal_secret` config for authenticated private package repositories
+- New example `deploy_with_extra_packages.py` demonstrating the feature
+- Model file verification before upload to catch issues early
+- End-to-end test script for real Modal deployment testing
+
+### Fixed
+- Fixed volume upload to use Modal 1.0 `batch_upload` context manager API
+- Model files are now correctly uploaded to volume root, fixing "MLmodel not found" errors
+- Fixed code generation indentation issues when using `modal_secret` and other optional configs
+
 ## [0.4.0] - 2026-01-16
 
 ### Added
@@ -106,7 +121,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full MLflow CLI integration (`mlflow deployments` commands)
 - Workspace targeting via URI (`modal:/workspace-name`)
 
-[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.2.5...v0.3.0

@@ -37,7 +37,6 @@ def test_generated_code_uses_new_api():
 
     code = _generate_modal_app_code(
         app_name="test-app",
-        model_path="/tmp/model",
         config=config,
         model_requirements=["pandas", "numpy"],
     )
@@ -91,7 +90,6 @@ def test_concurrent_inputs_at_class_level():
 
     code = _generate_modal_app_code(
         app_name="test-concurrent",
-        model_path="/tmp/model",
         config=config,
     )
 
@@ -144,7 +142,6 @@ def test_concurrent_inputs_omitted_when_default():
 
     code = _generate_modal_app_code(
         app_name="test-no-concurrent",
-        model_path="/tmp/model",
         config=config,
     )
 
@@ -250,7 +247,7 @@ def test_gpu_string_generation():
             "python_version": "3.10",
         }
 
-        code = _generate_modal_app_code("test", "/tmp", config)
+        code = _generate_modal_app_code("test", config)
         passed = expected_pattern in code
 
         status = "PASS" if passed else "FAIL"

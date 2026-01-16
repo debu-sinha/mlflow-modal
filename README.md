@@ -93,6 +93,10 @@ mlflow deployments delete -t modal --name my-model
 | `max_batch_size` | int | 8 | Max batch size when batching enabled |
 | `batch_wait_ms` | int | 100 | Batch wait time in milliseconds |
 | `python_version` | str | auto | Python version (auto-detected from model) |
+| `extra_pip_packages` | list | [] | Additional pip packages to install at deployment time |
+| `pip_index_url` | str | None | Custom PyPI index URL for private packages |
+| `pip_extra_index_url` | str | None | Additional PyPI index URL (fallback) |
+| `modal_secret` | str | None | Modal secret name containing pip credentials |
 
 ## Authentication
 
@@ -138,6 +142,67 @@ client.create_deployment(
     }
 )
 ```
+
+### Adding Extra Packages at Deployment Time
+
+Use `extra_pip_packages` when the model's auto-detected requirements are incomplete or you need production-specific packages:
+
+```python
+client.create_deployment(
+    name="my-model",
+    model_uri="runs:/abc123/model",
+    config={
+        "gpu": "A100",
+        "extra_pip_packages": [
+            "accelerate>=0.24",      # GPU inference optimization
+            "prometheus_client",     # Monitoring
+            "structlog",             # Production logging
+        ],
+    }
+)
+```
+
+Common use cases:
+- **Missing transitive dependencies**: Packages MLflow didn't auto-detect
+- **Inference optimizations**: `accelerate`, `bitsandbytes`, `onnxruntime-gpu`
+- **Production monitoring**: `prometheus_client`, `opentelemetry-api`
+- **Version overrides**: Pin specific versions for compatibility
+
+### Deploying with Private Packages
+
+For private PyPI servers or authenticated package repositories:
+
+**Step 1**: Create a Modal secret with your credentials:
+
+```bash
+# Create a secret with your private PyPI credentials
+modal secret create pypi-auth \
+    PIP_INDEX_URL="https://user:token@pypi.my-company.com/simple/" \
+    PIP_EXTRA_INDEX_URL="https://pypi.org/simple/"
+```
+
+**Step 2**: Reference the secret in your deployment:
+
+```python
+client.create_deployment(
+    name="my-model",
+    model_uri="runs:/abc123/model",
+    config={
+        # Option 1: Use Modal secret for authenticated access
+        "modal_secret": "pypi-auth",
+        "extra_pip_packages": ["my-private-package>=1.0"],
+
+        # Option 2: Direct URL (for unauthenticated private repos)
+        # "pip_index_url": "https://pypi.my-company.com/simple/",
+        # "pip_extra_index_url": "https://pypi.org/simple/",
+    }
+)
+```
+
+Supported private package sources:
+- **Private PyPI servers**: Artifactory, CodeArtifact, DevPI, Nexus
+- **Authenticated indexes**: Any pip-compatible index with auth tokens
+- **Wheel files**: Already supported via the `code/` directory in model artifacts
 
 ### Models with Private Dependencies
 

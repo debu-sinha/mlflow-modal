@@ -1,6 +1,6 @@
-# Contributing to mlflow-modal
+# Contributing to mlflow-modal-deploy
 
-Thank you for your interest in contributing to mlflow-modal! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to mlflow-modal-deploy! This document provides guidelines and instructions for contributing.
 
 ## Development Setup
 
@@ -14,8 +14,8 @@ Thank you for your interest in contributing to mlflow-modal! This document provi
 
 ```bash
 # Clone the repository
-git clone https://github.com/debu-sinha/mlflow-modal.git
-cd mlflow-modal
+git clone https://github.com/debu-sinha/mlflow-modal-deploy.git
+cd mlflow-modal-deploy
 
 # Install dependencies with uv
 uv sync --extra dev
@@ -111,7 +111,7 @@ TEST_MODAL_INTEGRATION=1 uv run pytest tests/ -v -m integration
 ### Bug Reports
 
 Include:
-- MLflow and mlflow-modal versions
+- MLflow and mlflow-modal-deploy versions
 - Modal SDK version
 - Python version
 - Steps to reproduce
