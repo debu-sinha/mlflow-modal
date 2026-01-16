@@ -127,6 +127,24 @@ class TestConfigValidation:
         result = client._apply_custom_config(base_config, {"allow_concurrent_inputs": 5})
         assert result["concurrent_inputs"] == 5
 
+    def test_new_modal_1_0_params_in_config(self):
+        client = ModalDeploymentClient("modal")
+        config = client._default_deployment_config()
+
+        assert "startup_timeout" in config
+        assert "target_inputs" in config
+        assert "buffer_containers" in config
+        assert config["startup_timeout"] is None
+        assert config["target_inputs"] is None
+        assert config["buffer_containers"] is None
+
+    def test_dedicated_gpu_syntax_accepted(self):
+        client = ModalDeploymentClient("modal")
+        base_config = client._default_deployment_config()
+
+        result = client._apply_custom_config(base_config, {"gpu": "H100!"})
+        assert result["gpu"] == "H100!"
+
 
 class TestModelRequirements:
     def test_empty_model_path_returns_empty_tuple(self, tmp_path):
@@ -383,6 +401,63 @@ class TestAppCodeGeneration:
         code = _generate_modal_app_code("fallback-gpu-app", "/model", config)
 
         assert 'gpu=["H100", "A100-80GB"]' in code
+
+    def test_target_inputs_generates_decorator(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+            "target_inputs": 3,
+        }
+
+        code = _generate_modal_app_code("target-inputs-app", "/model", config)
+
+        assert "@modal.concurrent(target_inputs=3)" in code
+
+    def test_buffer_containers_in_generated_code(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 2,
+            "max_containers": 10,
+            "buffer_containers": 3,
+            "concurrent_inputs": 1,
+        }
+
+        code = _generate_modal_app_code("buffer-app", "/model", config)
+
+        assert "buffer_containers=3" in code
+
+    def test_startup_timeout_in_generated_code(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "startup_timeout": 600,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+        }
+
+        code = _generate_modal_app_code("startup-timeout-app", "/model", config)
+
+        assert "startup_timeout=600" in code
 
 
 class TestClientInstance:

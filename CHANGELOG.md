@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `startup_timeout` parameter for separate container startup timeout (useful for large models)
+- `target_inputs` parameter for smarter autoscaler targeting in `@modal.concurrent`
+- `buffer_containers` parameter for extra idle containers under load
+- Dedicated GPU syntax support (`H100!` to prevent auto-upgrade)
+- Tests for all new Modal 1.0 parameters
+
+### Changed
+- Added `pyyaml` and `requests` as explicit dependencies
+
 ## [0.3.1] - 2026-01-16
 
 ### Fixed

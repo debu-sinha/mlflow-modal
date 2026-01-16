@@ -78,14 +78,17 @@ mlflow deployments delete -t modal --name my-model
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `gpu` | str/list | None | GPU type (T4, L4, L40S, A10, A100, A100-40GB, A100-80GB, H100, H200, B200), multi-GPU (`H100:8`), or fallback list (`["H100", "A100"]`) |
+| `gpu` | str/list | None | GPU type (T4, L4, L40S, A10, A100, A100-40GB, A100-80GB, H100, H200, B200), multi-GPU (`H100:8`), dedicated (`H100!`), or fallback list (`["H100", "A100"]`) |
 | `memory` | int | 512 | Memory allocation in MB |
 | `cpu` | float | 1.0 | CPU cores |
 | `timeout` | int | 300 | Request timeout in seconds |
+| `startup_timeout` | int | None | Container startup timeout (overrides timeout during model loading) |
 | `scaledown_window` | int | 60 | Seconds before idle container scales down |
 | `concurrent_inputs` | int | 1 | Max concurrent requests per container |
+| `target_inputs` | int | None | Target concurrency for autoscaler (enables smarter scaling) |
 | `min_containers` | int | 0 | Minimum warm containers |
 | `max_containers` | int | None | Maximum containers |
+| `buffer_containers` | int | None | Extra idle containers to maintain under load |
 | `enable_batching` | bool | False | Enable dynamic batching |
 | `max_batch_size` | int | 8 | Max batch size when batching enabled |
 | `batch_wait_ms` | int | 100 | Batch wait time in milliseconds |

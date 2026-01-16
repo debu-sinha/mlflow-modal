@@ -30,10 +30,13 @@ _DEFAULT_GPU = None
 _DEFAULT_MEMORY = 512  # MB
 _DEFAULT_CPU = 1.0
 _DEFAULT_TIMEOUT = 300  # seconds
+_DEFAULT_STARTUP_TIMEOUT = None  # seconds, overrides timeout during startup
 _DEFAULT_SCALEDOWN_WINDOW = 60  # seconds
 _DEFAULT_CONCURRENT_INPUTS = 1
+_DEFAULT_TARGET_INPUTS = None  # autoscaler target concurrency
 _DEFAULT_MIN_CONTAINERS = 0
 _DEFAULT_MAX_CONTAINERS = None
+_DEFAULT_BUFFER_CONTAINERS = None  # extra idle containers under load
 
 # Supported GPU types (see https://modal.com/docs/guide/gpu)
 SUPPORTED_GPUS = [
@@ -200,12 +203,15 @@ def _generate_modal_app_code(
     memory = config.get("memory", _DEFAULT_MEMORY)
     cpu = config.get("cpu", _DEFAULT_CPU)
     timeout = config.get("timeout", _DEFAULT_TIMEOUT)
+    startup_timeout = config.get("startup_timeout", _DEFAULT_STARTUP_TIMEOUT)
     scaledown_window = config.get("scaledown_window", _DEFAULT_SCALEDOWN_WINDOW)
     enable_batching = config.get("enable_batching", False)
     max_batch_size = config.get("max_batch_size", 8)
     batch_wait_ms = config.get("batch_wait_ms", 100)
     python_version = config.get("python_version", "3.10")
     concurrent_inputs = config.get("concurrent_inputs", _DEFAULT_CONCURRENT_INPUTS)
+    target_inputs = config.get("target_inputs", _DEFAULT_TARGET_INPUTS)
+    buffer_containers = config.get("buffer_containers", _DEFAULT_BUFFER_CONTAINERS)
 
     # Handle GPU config: string, multi-GPU string ("H100:8"), or fallback list
     if not gpu_config:
@@ -228,8 +234,12 @@ def _generate_modal_app_code(
         scaling_parts.append(f"min_containers={min_containers}")
     if max_containers is not None:
         scaling_parts.append(f"max_containers={max_containers}")
+    if buffer_containers is not None:
+        scaling_parts.append(f"buffer_containers={buffer_containers}")
     if scaledown_window is not None:
         scaling_parts.append(f"scaledown_window={scaledown_window}")
+    if startup_timeout is not None:
+        scaling_parts.append(f"startup_timeout={startup_timeout}")
 
     scaling_str = "\n            ".join(f"{part}," for part in scaling_parts)
 
@@ -248,8 +258,13 @@ def _generate_modal_app_code(
 
     # Build concurrent decorator for class level (Modal 1.0+ pattern)
     concurrent_decorator_line = ""
-    if concurrent_inputs > 1:
-        concurrent_decorator_line = f"@modal.concurrent(max_inputs={concurrent_inputs})\n        "
+    if concurrent_inputs > 1 or target_inputs is not None:
+        concurrent_args = []
+        if concurrent_inputs > 1:
+            concurrent_args.append(f"max_inputs={concurrent_inputs}")
+        if target_inputs is not None:
+            concurrent_args.append(f"target_inputs={target_inputs}")
+        concurrent_decorator_line = f"@modal.concurrent({', '.join(concurrent_args)})\n        "
 
     code = textwrap.dedent(f'''
         """
@@ -365,13 +380,16 @@ class ModalDeploymentClient(BaseDeploymentClient):
             "memory": _DEFAULT_MEMORY,
             "cpu": _DEFAULT_CPU,
             "timeout": _DEFAULT_TIMEOUT,
+            "startup_timeout": _DEFAULT_STARTUP_TIMEOUT,
             "scaledown_window": _DEFAULT_SCALEDOWN_WINDOW,
             "enable_batching": False,
             "max_batch_size": 8,
             "batch_wait_ms": 100,
             "concurrent_inputs": _DEFAULT_CONCURRENT_INPUTS,
+            "target_inputs": _DEFAULT_TARGET_INPUTS,
             "min_containers": _DEFAULT_MIN_CONTAINERS,
             "max_containers": _DEFAULT_MAX_CONTAINERS,
+            "buffer_containers": _DEFAULT_BUFFER_CONTAINERS,
             "python_version": None,
         }
 
@@ -411,12 +429,15 @@ class ModalDeploymentClient(BaseDeploymentClient):
         int_fields = {
             "memory",
             "timeout",
+            "startup_timeout",
             "scaledown_window",
             "max_batch_size",
             "batch_wait_ms",
             "min_containers",
             "max_containers",
+            "buffer_containers",
             "concurrent_inputs",
+            "target_inputs",
         }
         float_fields = {"cpu"}
         bool_fields = {"enable_batching"}
