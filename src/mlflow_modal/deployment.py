@@ -212,6 +212,10 @@ def _generate_modal_app_code(
     concurrent_inputs = config.get("concurrent_inputs", _DEFAULT_CONCURRENT_INPUTS)
     target_inputs = config.get("target_inputs", _DEFAULT_TARGET_INPUTS)
     buffer_containers = config.get("buffer_containers", _DEFAULT_BUFFER_CONTAINERS)
+    extra_pip_packages = config.get("extra_pip_packages", [])
+    pip_index_url = config.get("pip_index_url")
+    pip_extra_index_url = config.get("pip_extra_index_url")
+    modal_secret = config.get("modal_secret")
 
     # Handle GPU config: string, multi-GPU string ("H100:8"), or fallback list
     if not gpu_config:
@@ -224,7 +228,19 @@ def _generate_modal_app_code(
     pip_packages = ["mlflow"]
     if model_requirements:
         pip_packages.extend(model_requirements)
+    if extra_pip_packages:
+        pip_packages.extend(extra_pip_packages)
     uv_pip_install_str = ", ".join(f'"{pkg}"' for pkg in pip_packages)
+
+    # Build pip install arguments for private repos
+    pip_install_kwargs = []
+    if pip_index_url:
+        pip_install_kwargs.append(f'index_url="{pip_index_url}"')
+    if pip_extra_index_url:
+        pip_install_kwargs.append(f'extra_index_url="{pip_extra_index_url}"')
+    pip_install_kwargs_str = ", ".join(pip_install_kwargs)
+    if pip_install_kwargs_str:
+        pip_install_kwargs_str = ", " + pip_install_kwargs_str
 
     scaling_parts = []
     min_containers = config.get("min_containers", _DEFAULT_MIN_CONTAINERS)
@@ -266,6 +282,13 @@ def _generate_modal_app_code(
             concurrent_args.append(f"target_inputs={target_inputs}")
         concurrent_decorator_line = f"@modal.concurrent({', '.join(concurrent_args)})\n        "
 
+    # Build secret reference if specified
+    secret_str = ""
+    secrets_arg = ""
+    if modal_secret:
+        secret_str = f'\npip_secret = modal.Secret.from_name("{modal_secret}")'
+        secrets_arg = "secrets=[pip_secret],"
+
     code = textwrap.dedent(f'''
         """
         Modal app for serving MLflow model: {app_name}
@@ -277,10 +300,11 @@ def _generate_modal_app_code(
 
         model_volume = modal.Volume.from_name("{app_name}-model-volume", create_if_missing=True)
         MODEL_DIR = "/model"
+{secret_str}
 
         image = (
             modal.Image.debian_slim(python_version="{python_version}")
-            .uv_pip_install({uv_pip_install_str})
+            .uv_pip_install({uv_pip_install_str}{pip_install_kwargs_str})
         )
 
         @app.cls(
@@ -290,6 +314,7 @@ def _generate_modal_app_code(
             cpu={cpu},
             timeout={timeout},
             {scaling_str}
+            {secrets_arg}
             volumes={{MODEL_DIR: model_volume}},
         )
         {concurrent_decorator_line}class MLflowModel:
@@ -391,6 +416,10 @@ class ModalDeploymentClient(BaseDeploymentClient):
             "max_containers": _DEFAULT_MAX_CONTAINERS,
             "buffer_containers": _DEFAULT_BUFFER_CONTAINERS,
             "python_version": None,
+            "extra_pip_packages": [],
+            "pip_index_url": None,
+            "pip_extra_index_url": None,
+            "modal_secret": None,
         }
 
     def _validate_gpu_config(self, gpu_config: str | list[str]) -> None:
@@ -532,20 +561,41 @@ class ModalDeploymentClient(BaseDeploymentClient):
             volume_name = f"{name}-model-volume"
             _clear_volume(modal, volume_name)
 
+            # Verify model files exist before upload
+            mlmodel_path = os.path.join(local_model_path, "MLmodel")
+            if not os.path.exists(mlmodel_path):
+                raise MlflowException(
+                    f"MLmodel file not found at {mlmodel_path}. "
+                    f"Contents of {local_model_path}: {os.listdir(local_model_path)}",
+                    error_code=RESOURCE_DOES_NOT_EXIST,
+                )
+
             _logger.info(f"Uploading model to Modal volume: {volume_name}")
+            _logger.info(f"Model files: {os.listdir(local_model_path)}")
             volume = modal.Volume.from_name(volume_name, create_if_missing=True)
-            volume.batch_upload(local_model_path, "/", force=True)
 
-            # Upload wheel files to a separate wheels/ directory in the volume
-            if wheel_files:
-                wheels_dir = os.path.join(tmp_dir.path(), "wheels")
-                os.makedirs(wheels_dir, exist_ok=True)
-                import shutil
+            # Upload model files using Modal 1.0 batch_upload context manager
+            with volume.batch_upload(force=True) as batch:
+                # Upload all files and directories from model path to volume root
+                for item in os.listdir(local_model_path):
+                    item_path = os.path.join(local_model_path, item)
+                    if os.path.isfile(item_path):
+                        batch.put_file(item_path, f"/{item}")
+                        _logger.debug(f"Uploaded file: /{item}")
+                    elif os.path.isdir(item_path):
+                        batch.put_directory(item_path, f"/{item}")
+                        _logger.debug(f"Uploaded directory: /{item}")
 
-                for whl in wheel_files:
-                    shutil.copy(whl, wheels_dir)
-                _logger.info(f"Uploading {len(wheel_files)} wheel file(s) to volume")
-                volume.batch_upload(wheels_dir, "/wheels", force=True)
+                # Upload wheel files to a separate wheels/ directory
+                if wheel_files:
+                    wheels_dir = os.path.join(tmp_dir.path(), "wheels")
+                    os.makedirs(wheels_dir, exist_ok=True)
+                    import shutil
+
+                    for whl in wheel_files:
+                        shutil.copy(whl, wheels_dir)
+                    _logger.info(f"Uploading {len(wheel_files)} wheel file(s) to volume")
+                    batch.put_directory(wheels_dir, "/wheels")
 
             _logger.info(f"Deploying Modal app: {name}")
             deploy_cmd = ["modal", "deploy", app_file]

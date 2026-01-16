@@ -12,7 +12,7 @@ from mlflow_modal.deployment import (
     target_help,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = [
     "ModalDeploymentClient",
     "run_local",

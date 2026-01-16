@@ -664,3 +664,161 @@ class TestAppCodeGenerationEdgeCases:
         code = _generate_modal_app_code("no-wheel-app", "/model", config, None, None)
 
         assert "Install wheel dependencies" not in code
+
+    def test_extra_pip_packages_in_generated_code(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+            "extra_pip_packages": ["transformers>=4.30", "torch==2.0.0"],
+        }
+
+        code = _generate_modal_app_code("extra-deps-app", "/model", config)
+
+        assert '"transformers>=4.30"' in code
+        assert '"torch==2.0.0"' in code
+        assert '"mlflow"' in code
+
+    def test_extra_pip_packages_combined_with_model_requirements(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+            "extra_pip_packages": ["transformers>=4.30"],
+        }
+        model_requirements = ["numpy==1.24.0", "pandas>=2.0"]
+
+        code = _generate_modal_app_code("combined-deps-app", "/model", config, model_requirements)
+
+        assert '"mlflow"' in code
+        assert '"numpy==1.24.0"' in code
+        assert '"pandas>=2.0"' in code
+        assert '"transformers>=4.30"' in code
+
+
+class TestExtraPipPackagesConfig:
+    def test_extra_pip_packages_in_default_config(self):
+        client = ModalDeploymentClient("modal")
+        config = client._default_deployment_config()
+
+        assert "extra_pip_packages" in config
+        assert config["extra_pip_packages"] == []
+
+    def test_extra_pip_packages_custom_config(self):
+        client = ModalDeploymentClient("modal")
+        base_config = client._default_deployment_config()
+
+        custom = {"extra_pip_packages": ["torch", "transformers"]}
+        result = client._apply_custom_config(base_config, custom)
+
+        assert result["extra_pip_packages"] == ["torch", "transformers"]
+
+
+class TestPrivateRepoConfig:
+    def test_private_repo_options_in_default_config(self):
+        client = ModalDeploymentClient("modal")
+        config = client._default_deployment_config()
+
+        assert "pip_index_url" in config
+        assert "pip_extra_index_url" in config
+        assert "modal_secret" in config
+        assert config["pip_index_url"] is None
+        assert config["pip_extra_index_url"] is None
+        assert config["modal_secret"] is None
+
+    def test_pip_index_url_in_generated_code(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+            "pip_index_url": "https://pypi.my-company.com/simple/",
+        }
+
+        code = _generate_modal_app_code("private-repo-app", "/model", config)
+
+        assert 'index_url="https://pypi.my-company.com/simple/"' in code
+
+    def test_pip_extra_index_url_in_generated_code(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+            "pip_extra_index_url": "https://private.pypi.org/simple/",
+        }
+
+        code = _generate_modal_app_code("extra-index-app", "/model", config)
+
+        assert 'extra_index_url="https://private.pypi.org/simple/"' in code
+
+    def test_modal_secret_in_generated_code(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+            "modal_secret": "pip-credentials",
+        }
+
+        code = _generate_modal_app_code("secret-app", "/model", config)
+
+        assert 'modal.Secret.from_name("pip-credentials")' in code
+        assert "secrets=[pip_secret]" in code
+
+    def test_combined_private_repo_config(self):
+        config = {
+            "gpu": None,
+            "memory": 512,
+            "cpu": 1.0,
+            "timeout": 300,
+            "scaledown_window": 60,
+            "enable_batching": False,
+            "python_version": "3.10",
+            "min_containers": 0,
+            "max_containers": None,
+            "concurrent_inputs": 1,
+            "pip_index_url": "https://pypi.my-company.com/simple/",
+            "pip_extra_index_url": "https://pypi.python.org/simple/",
+            "modal_secret": "pypi-auth",
+            "extra_pip_packages": ["my-private-package>=1.0"],
+        }
+
+        code = _generate_modal_app_code("full-private-app", "/model", config)
+
+        assert 'index_url="https://pypi.my-company.com/simple/"' in code
+        assert 'extra_index_url="https://pypi.python.org/simple/"' in code
+        assert 'modal.Secret.from_name("pypi-auth")' in code
+        assert '"my-private-package>=1.0"' in code
