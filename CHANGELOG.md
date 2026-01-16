@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-16
+
 ### Added
 - `startup_timeout` parameter for separate container startup timeout (useful for large models)
 - `target_inputs` parameter for smarter autoscaler targeting in `@modal.concurrent`
@@ -104,7 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full MLflow CLI integration (`mlflow deployments` commands)
 - Workspace targeting via URI (`modal:/workspace-name`)
 
-[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.2.5...v0.3.0
 [0.2.5]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.2.4...v0.2.5
