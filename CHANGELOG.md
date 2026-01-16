@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed volume upload to use Modal 1.0 `batch_upload` context manager API
 - Model files are now correctly uploaded to volume root, fixing "MLmodel not found" errors
+- Fixed code generation indentation issues when using `modal_secret` and other optional configs
 
 ## [0.4.0] - 2026-01-16
 

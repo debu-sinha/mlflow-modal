@@ -183,7 +183,6 @@ def _import_modal():
 
 def _generate_modal_app_code(
     app_name: str,
-    model_path: str,
     config: dict[str, Any],
     model_requirements: list[str] | None = None,
     wheel_filenames: list[str] | None = None,
@@ -193,7 +192,6 @@ def _generate_modal_app_code(
 
     Args:
         app_name: Name of the Modal app
-        model_path: Path to the MLflow model directory
         config: Deployment configuration
         model_requirements: List of pip requirements
         wheel_filenames: List of wheel filenames (just names, not paths) to install from volume
@@ -548,7 +546,7 @@ class ModalDeploymentClient(BaseDeploymentClient):
 
             wheel_filenames = [os.path.basename(w) for w in wheel_files] if wheel_files else None
             app_code = _generate_modal_app_code(
-                name, local_model_path, deployment_config, model_requirements, wheel_filenames
+                name, deployment_config, model_requirements, wheel_filenames
             )
 
             app_file = os.path.join(tmp_dir.path(), "modal_app.py")
@@ -796,7 +794,7 @@ def run_local(
 
         wheel_filenames = [os.path.basename(w) for w in wheel_files] if wheel_files else None
         app_code = _generate_modal_app_code(
-            name, local_model_path, deployment_config, model_requirements, wheel_filenames
+            name, deployment_config, model_requirements, wheel_filenames
         )
 
         app_file = os.path.join(tmp_dir.path(), "modal_app.py")

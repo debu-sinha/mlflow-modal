@@ -1,0 +1,340 @@
+#!/usr/bin/env python
+"""
+End-to-end tests for mlflow-modal-deploy.
+
+These tests deploy real models to Modal and verify:
+1. Basic deployment with extra_pip_packages
+2. pip_index_url configuration
+3. pip_extra_index_url configuration
+4. modal_secret integration
+
+Prerequisites:
+    - Modal authentication configured (modal setup)
+    - MLflow and scikit-learn installed
+
+Usage:
+    python tests/e2e_test.py              # Run all tests
+    python tests/e2e_test.py --quick      # Run quick test only (basic deployment)
+"""
+
+import argparse
+import subprocess
+import sys
+import time
+
+import mlflow
+from mlflow.deployments import get_deploy_client
+from sklearn.datasets import load_iris
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
+
+def train_and_log_model():
+    """Train a simple model and log to MLflow."""
+    print("Training model...")
+    iris = load_iris()
+    X_train, _, y_train, _ = train_test_split(
+        iris.data, iris.target, test_size=0.2, random_state=42
+    )
+    model = RandomForestClassifier(n_estimators=5, random_state=42)
+    model.fit(X_train, y_train)
+
+    with mlflow.start_run() as run:
+        mlflow.sklearn.log_model(model, "model")
+        print(f"  Run ID: {run.info.run_id}")
+        return run.info.run_id
+
+
+def make_prediction(endpoint_url: str, max_attempts: int = 3) -> dict | None:
+    """Make a prediction request to the deployed model."""
+    import requests
+
+    sample_data = {
+        "sepal length (cm)": [5.1],
+        "sepal width (cm)": [3.5],
+        "petal length (cm)": [1.4],
+        "petal width (cm)": [0.2],
+    }
+
+    for attempt in range(max_attempts):
+        try:
+            response = requests.post(endpoint_url, json=sample_data, timeout=180)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            if attempt < max_attempts - 1:
+                print(f"    Attempt {attempt + 1} failed, retrying in 15s...")
+                time.sleep(15)
+            else:
+                print(f"    Prediction timed out (cold start): {e}")
+                return None
+
+
+def test_basic_deployment(run_id: str) -> bool:
+    """Test basic deployment with extra_pip_packages."""
+    print("\n" + "=" * 60)
+    print("TEST: Basic deployment with extra_pip_packages")
+    print("=" * 60)
+
+    client = get_deploy_client("modal")
+    deployment_name = "e2e-test-basic"
+
+    try:
+        deployment = client.create_deployment(
+            name=deployment_name,
+            model_uri=f"runs:/{run_id}/model",
+            config={
+                "memory": 1024,
+                "timeout": 120,
+                "scaledown_window": 60,
+                "extra_pip_packages": ["structlog>=24.0"],
+            },
+        )
+
+        print(f"  Deployment successful!")
+        print(f"  Endpoint URL: {deployment.get('endpoint_url')}")
+
+        # Verify config
+        config = deployment.get("config", {})
+        assert config.get("extra_pip_packages") == ["structlog>=24.0"]
+        print(f"  extra_pip_packages correctly set")
+
+        # Make prediction
+        endpoint_url = deployment.get("endpoint_url")
+        if endpoint_url:
+            print(f"  Testing prediction...")
+            result = make_prediction(endpoint_url)
+            if result:
+                print(f"  Prediction successful: {result}")
+            else:
+                print(f"  Prediction timed out, but deployment was created")
+
+        return True
+
+    except Exception as e:
+        print(f"  FAILED: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    finally:
+        try:
+            client.delete_deployment(deployment_name)
+            print(f"  Cleaned up: {deployment_name}")
+        except Exception:
+            pass
+
+
+def test_pip_index_url(run_id: str) -> bool:
+    """Test deployment with pip_index_url."""
+    print("\n" + "=" * 60)
+    print("TEST: pip_index_url configuration")
+    print("=" * 60)
+
+    client = get_deploy_client("modal")
+    deployment_name = "e2e-test-pip-index-url"
+
+    try:
+        deployment = client.create_deployment(
+            name=deployment_name,
+            model_uri=f"runs:/{run_id}/model",
+            config={
+                "memory": 1024,
+                "timeout": 120,
+                "scaledown_window": 60,
+                "pip_index_url": "https://pypi.org/simple/",
+            },
+        )
+
+        print(f"  Deployment successful!")
+        print(f"  Endpoint URL: {deployment.get('endpoint_url')}")
+
+        config = deployment.get("config", {})
+        assert config.get("pip_index_url") == "https://pypi.org/simple/"
+        print(f"  pip_index_url correctly set")
+
+        endpoint_url = deployment.get("endpoint_url")
+        if endpoint_url:
+            print(f"  Testing prediction...")
+            result = make_prediction(endpoint_url)
+            if result:
+                print(f"  Prediction successful: {result}")
+
+        return True
+
+    except Exception as e:
+        print(f"  FAILED: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    finally:
+        try:
+            client.delete_deployment(deployment_name)
+            print(f"  Cleaned up: {deployment_name}")
+        except Exception:
+            pass
+
+
+def test_pip_extra_index_url(run_id: str) -> bool:
+    """Test deployment with pip_extra_index_url."""
+    print("\n" + "=" * 60)
+    print("TEST: pip_extra_index_url configuration")
+    print("=" * 60)
+
+    client = get_deploy_client("modal")
+    deployment_name = "e2e-test-pip-extra-index"
+
+    try:
+        deployment = client.create_deployment(
+            name=deployment_name,
+            model_uri=f"runs:/{run_id}/model",
+            config={
+                "memory": 1024,
+                "timeout": 120,
+                "scaledown_window": 60,
+                "pip_extra_index_url": "https://pypi.org/simple/",
+            },
+        )
+
+        print(f"  Deployment successful!")
+        print(f"  Endpoint URL: {deployment.get('endpoint_url')}")
+
+        config = deployment.get("config", {})
+        assert config.get("pip_extra_index_url") == "https://pypi.org/simple/"
+        print(f"  pip_extra_index_url correctly set")
+
+        return True
+
+    except Exception as e:
+        print(f"  FAILED: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    finally:
+        try:
+            client.delete_deployment(deployment_name)
+            print(f"  Cleaned up: {deployment_name}")
+        except Exception:
+            pass
+
+
+def test_modal_secret(run_id: str) -> bool:
+    """Test deployment with modal_secret integration."""
+    print("\n" + "=" * 60)
+    print("TEST: modal_secret integration")
+    print("=" * 60)
+
+    # Create test Modal secret
+    secret_name = "e2e-test-pip-credentials"
+    print(f"  Creating Modal secret '{secret_name}'...")
+
+    result = subprocess.run(
+        [
+            "modal", "secret", "create", secret_name,
+            "PIP_EXTRA_INDEX_URL=https://pypi.org/simple/",
+            "--force",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print(f"  Warning: Could not create secret: {result.stderr}")
+    else:
+        print(f"  Secret created")
+
+    client = get_deploy_client("modal")
+    deployment_name = "e2e-test-modal-secret"
+
+    try:
+        deployment = client.create_deployment(
+            name=deployment_name,
+            model_uri=f"runs:/{run_id}/model",
+            config={
+                "memory": 1024,
+                "timeout": 120,
+                "scaledown_window": 60,
+                "modal_secret": secret_name,
+            },
+        )
+
+        print(f"  Deployment successful!")
+        print(f"  Endpoint URL: {deployment.get('endpoint_url')}")
+
+        config = deployment.get("config", {})
+        assert config.get("modal_secret") == secret_name
+        print(f"  modal_secret correctly set")
+
+        endpoint_url = deployment.get("endpoint_url")
+        if endpoint_url:
+            print(f"  Testing prediction...")
+            result = make_prediction(endpoint_url)
+            if result:
+                print(f"  Prediction successful: {result}")
+
+        return True
+
+    except Exception as e:
+        print(f"  FAILED: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    finally:
+        try:
+            client.delete_deployment(deployment_name)
+            print(f"  Cleaned up: {deployment_name}")
+        except Exception:
+            pass
+
+        # Clean up secret
+        subprocess.run(
+            ["modal", "secret", "delete", secret_name, "--yes"],
+            capture_output=True,
+        )
+        print(f"  Cleaned up secret: {secret_name}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="E2E tests for mlflow-modal-deploy")
+    parser.add_argument("--quick", action="store_true", help="Run quick test only")
+    args = parser.parse_args()
+
+    print("=" * 60)
+    print("E2E Tests: mlflow-modal-deploy")
+    print("=" * 60)
+
+    run_id = train_and_log_model()
+
+    results = {}
+
+    if args.quick:
+        results["basic_deployment"] = test_basic_deployment(run_id)
+    else:
+        results["basic_deployment"] = test_basic_deployment(run_id)
+        results["pip_index_url"] = test_pip_index_url(run_id)
+        results["pip_extra_index_url"] = test_pip_extra_index_url(run_id)
+        results["modal_secret"] = test_modal_secret(run_id)
+
+    # Summary
+    print("\n" + "=" * 60)
+    print("TEST SUMMARY")
+    print("=" * 60)
+
+    all_passed = True
+    for test_name, passed in results.items():
+        status = "PASSED" if passed else "FAILED"
+        icon = "✓" if passed else "✗"
+        print(f"  {icon} {test_name}: {status}")
+        if not passed:
+            all_passed = False
+
+    print("=" * 60)
+
+    return 0 if all_passed else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

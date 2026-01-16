@@ -234,7 +234,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("test-app", "/model", config)
+        code = _generate_modal_app_code("test-app", config)
 
         assert 'app = modal.App("test-app")' in code
         assert "gpu=None" in code
@@ -257,7 +257,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("gpu-app", "/model", config)
+        code = _generate_modal_app_code("gpu-app", config)
 
         assert 'gpu="T4"' in code
         assert "memory=2048" in code
@@ -279,7 +279,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("batch-app", "/model", config)
+        code = _generate_modal_app_code("batch-app", config)
 
         assert "@modal.batched" in code
         assert "max_batch_size=16" in code
@@ -301,7 +301,7 @@ class TestAppCodeGeneration:
         }
         requirements = ["numpy==1.24.0", "pandas>=2.0"]
 
-        code = _generate_modal_app_code("req-app", "/model", config, requirements)
+        code = _generate_modal_app_code("req-app", config, requirements)
 
         assert '"mlflow"' in code
         assert '"numpy==1.24.0"' in code
@@ -321,7 +321,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("scale-app", "/model", config)
+        code = _generate_modal_app_code("scale-app", config)
 
         assert "min_containers=2" in code
         assert "max_containers=10" in code
@@ -341,7 +341,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 5,
         }
 
-        code = _generate_modal_app_code("concurrent-app", "/model", config)
+        code = _generate_modal_app_code("concurrent-app", config)
 
         assert "@modal.concurrent(max_inputs=5)" in code
 
@@ -359,7 +359,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("no-concurrent-app", "/model", config)
+        code = _generate_modal_app_code("no-concurrent-app", config)
 
         assert "@modal.concurrent" not in code
 
@@ -378,7 +378,7 @@ class TestAppCodeGeneration:
         }
         wheel_filenames = ["my_package-1.0.0-py3-none-any.whl", "other-2.0.0-py3-none-any.whl"]
 
-        code = _generate_modal_app_code("wheel-app", "/model", config, None, wheel_filenames)
+        code = _generate_modal_app_code("wheel-app", config, None, wheel_filenames)
 
         assert "Install wheel dependencies from volume" in code
         assert "/model/wheels/my_package-1.0.0-py3-none-any.whl" in code
@@ -398,7 +398,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("fallback-gpu-app", "/model", config)
+        code = _generate_modal_app_code("fallback-gpu-app", config)
 
         assert 'gpu=["H100", "A100-80GB"]' in code
 
@@ -417,7 +417,7 @@ class TestAppCodeGeneration:
             "target_inputs": 3,
         }
 
-        code = _generate_modal_app_code("target-inputs-app", "/model", config)
+        code = _generate_modal_app_code("target-inputs-app", config)
 
         assert "@modal.concurrent(target_inputs=3)" in code
 
@@ -436,7 +436,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("buffer-app", "/model", config)
+        code = _generate_modal_app_code("buffer-app", config)
 
         assert "buffer_containers=3" in code
 
@@ -455,7 +455,7 @@ class TestAppCodeGeneration:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("startup-timeout-app", "/model", config)
+        code = _generate_modal_app_code("startup-timeout-app", config)
 
         assert "startup_timeout=600" in code
 
@@ -623,7 +623,7 @@ class TestAppCodeGenerationEdgeCases:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("default-app", "/model", config)
+        code = _generate_modal_app_code("default-app", config)
 
         assert "min_containers=0" not in code
         assert "max_containers=" not in code or "max_containers=None" not in code
@@ -642,7 +642,7 @@ class TestAppCodeGenerationEdgeCases:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("no-req-app", "/model", config, [])
+        code = _generate_modal_app_code("no-req-app", config, [])
 
         assert ".uv_pip_install" in code
         assert '"mlflow"' in code
@@ -661,7 +661,7 @@ class TestAppCodeGenerationEdgeCases:
             "concurrent_inputs": 1,
         }
 
-        code = _generate_modal_app_code("no-wheel-app", "/model", config, None, None)
+        code = _generate_modal_app_code("no-wheel-app", config, None, None)
 
         assert "Install wheel dependencies" not in code
 
@@ -680,7 +680,7 @@ class TestAppCodeGenerationEdgeCases:
             "extra_pip_packages": ["transformers>=4.30", "torch==2.0.0"],
         }
 
-        code = _generate_modal_app_code("extra-deps-app", "/model", config)
+        code = _generate_modal_app_code("extra-deps-app", config)
 
         assert '"transformers>=4.30"' in code
         assert '"torch==2.0.0"' in code
@@ -702,7 +702,7 @@ class TestAppCodeGenerationEdgeCases:
         }
         model_requirements = ["numpy==1.24.0", "pandas>=2.0"]
 
-        code = _generate_modal_app_code("combined-deps-app", "/model", config, model_requirements)
+        code = _generate_modal_app_code("combined-deps-app", config, model_requirements)
 
         assert '"mlflow"' in code
         assert '"numpy==1.24.0"' in code
@@ -755,7 +755,7 @@ class TestPrivateRepoConfig:
             "pip_index_url": "https://pypi.my-company.com/simple/",
         }
 
-        code = _generate_modal_app_code("private-repo-app", "/model", config)
+        code = _generate_modal_app_code("private-repo-app", config)
 
         assert 'index_url="https://pypi.my-company.com/simple/"' in code
 
@@ -774,7 +774,7 @@ class TestPrivateRepoConfig:
             "pip_extra_index_url": "https://private.pypi.org/simple/",
         }
 
-        code = _generate_modal_app_code("extra-index-app", "/model", config)
+        code = _generate_modal_app_code("extra-index-app", config)
 
         assert 'extra_index_url="https://private.pypi.org/simple/"' in code
 
@@ -793,7 +793,7 @@ class TestPrivateRepoConfig:
             "modal_secret": "pip-credentials",
         }
 
-        code = _generate_modal_app_code("secret-app", "/model", config)
+        code = _generate_modal_app_code("secret-app", config)
 
         assert 'modal.Secret.from_name("pip-credentials")' in code
         assert "secrets=[pip_secret]" in code
@@ -816,7 +816,7 @@ class TestPrivateRepoConfig:
             "extra_pip_packages": ["my-private-package>=1.0"],
         }
 
-        code = _generate_modal_app_code("full-private-app", "/model", config)
+        code = _generate_modal_app_code("full-private-app", config)
 
         assert 'index_url="https://pypi.my-company.com/simple/"' in code
         assert 'extra_index_url="https://pypi.python.org/simple/"' in code
