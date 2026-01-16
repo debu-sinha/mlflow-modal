@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.3.1] - 2026-01-16
+
+### Fixed
+- Updated README to reflect Modal 1.0 API changes
+- Fixed version test to not hardcode version string
+
+## [0.3.0] - 2026-01-16
+
+### Added
+- Support for all Modal GPU types: T4, L4, L40S, A10, A100, A100-40GB, A100-80GB, H100, H200, B200
+- Multi-GPU syntax support (e.g., `"H100:8"` for 8x H100)
+- GPU fallback list support (e.g., `["H100", "A100"]`)
+- `concurrent_inputs` parameter for concurrent request handling per container
+
+### Changed
+- **BREAKING**: Minimum Modal version is now 1.0.0
+- Renamed `container_idle_timeout` to `scaledown_window` (backward compatible)
+- Renamed `allow_concurrent_inputs` to `concurrent_inputs` (backward compatible)
+- Updated generated code to use `@modal.fastapi_endpoint` instead of deprecated `@modal.web_endpoint`
+- Updated generated code to use `.uv_pip_install()` instead of `.pip_install()` for faster builds
+- Moved `@modal.concurrent` decorator to class level per Modal 1.0 best practices
+
+### Deprecated
+- `container_idle_timeout` parameter (use `scaledown_window` instead)
+- `allow_concurrent_inputs` parameter (use `concurrent_inputs` instead)
+
 ## [0.2.5] - 2025-01-15
 
 ### Fixed
@@ -66,6 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full MLflow CLI integration (`mlflow deployments` commands)
 - Workspace targeting via URI (`modal:/workspace-name`)
 
+[Unreleased]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.2.5...v0.3.0
 [0.2.5]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/debu-sinha/mlflow-modal-deploy/compare/v0.2.2...v0.2.3

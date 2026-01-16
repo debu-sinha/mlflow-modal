@@ -127,13 +127,57 @@ Include:
 
 ## Release Process
 
-Releases are managed by maintainers:
+Releases are automated via GitHub Actions with trusted publishing to PyPI.
 
-1. Update version in `pyproject.toml` and `src/mlflow_modal/__init__.py`
-2. Update CHANGELOG.md
-3. Create release PR
-4. Tag release after merge
-5. Publish to PyPI
+### Pre-Release Checklist
+
+Before creating a release, verify:
+
+- [ ] All tests pass locally: `uv run pytest tests/ -v`
+- [ ] Pre-commit hooks pass: `uv run pre-commit run --all-files`
+- [ ] Version bumped in both files:
+  - `pyproject.toml`
+  - `src/mlflow_modal/__init__.py`
+- [ ] CHANGELOG.md updated with new version section
+- [ ] README.md reflects current API and features
+- [ ] No hardcoded version strings in tests
+
+### Release Steps
+
+```bash
+# 1. Run pre-release validation
+./scripts/pre-release.sh
+
+# 2. Create release branch
+git checkout -b release/vX.Y.Z
+
+# 3. Bump version
+# Edit pyproject.toml and src/mlflow_modal/__init__.py
+
+# 4. Update CHANGELOG.md
+# Add new version section with changes
+
+# 5. Commit and push
+git add -A
+git commit -s -m "Release vX.Y.Z"
+git push origin release/vX.Y.Z
+
+# 6. Create PR and merge to main
+
+# 7. Create and push tag (triggers PyPI publish)
+git checkout main
+git pull
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+### Version Numbering
+
+We follow [Semantic Versioning](https://semver.org/):
+
+- **MAJOR**: Breaking changes
+- **MINOR**: New features (backward compatible)
+- **PATCH**: Bug fixes (backward compatible)
 
 ## Questions?
 
