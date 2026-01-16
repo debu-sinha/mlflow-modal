@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import urllib.parse
 from typing import Any
@@ -181,6 +182,31 @@ def _import_modal():
         ) from e
 
 
+_VALID_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
+
+
+def _sanitize_deployment_name(name: str) -> str:
+    """Validate and sanitize deployment name to prevent code injection."""
+    if not name:
+        raise MlflowException("Deployment name cannot be empty", error_code=INVALID_PARAMETER_VALUE)
+    if len(name) > 63:
+        raise MlflowException(
+            f"Deployment name '{name}' exceeds 63 character limit", error_code=INVALID_PARAMETER_VALUE
+        )
+    if not _VALID_NAME_PATTERN.match(name):
+        raise MlflowException(
+            f"Invalid deployment name '{name}'. Must start with a letter and contain only "
+            "alphanumeric characters, underscores, and hyphens.",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
+    return name
+
+
+def _escape_string_for_codegen(value: str) -> str:
+    """Escape a string for safe inclusion in generated Python code."""
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
 def _generate_modal_app_code(
     app_name: str,
     config: dict[str, Any],
@@ -229,12 +255,12 @@ def _generate_modal_app_code(
         pip_packages.extend(extra_pip_packages)
     uv_pip_install_str = ", ".join(f'"{pkg}"' for pkg in pip_packages)
 
-    # Build pip install arguments for private repos
+    # Build pip install arguments for private repos (escape URLs for safe code generation)
     pip_install_kwargs = []
     if pip_index_url:
-        pip_install_kwargs.append(f'index_url="{pip_index_url}"')
+        pip_install_kwargs.append(f'index_url="{_escape_string_for_codegen(pip_index_url)}"')
     if pip_extra_index_url:
-        pip_install_kwargs.append(f'extra_index_url="{pip_extra_index_url}"')
+        pip_install_kwargs.append(f'extra_index_url="{_escape_string_for_codegen(pip_extra_index_url)}"')
     pip_install_kwargs_str = ", ".join(pip_install_kwargs)
     if pip_install_kwargs_str:
         pip_install_kwargs_str = ", " + pip_install_kwargs_str
@@ -279,11 +305,11 @@ def _generate_modal_app_code(
             concurrent_args.append(f"target_inputs={target_inputs}")
         concurrent_decorator_line = f"@modal.concurrent({', '.join(concurrent_args)})\n        "
 
-    # Build secret reference if specified
+    # Build secret reference if specified (escape for safe code generation)
     secret_str = ""
     secrets_arg = ""
     if modal_secret:
-        secret_str = f'pip_secret = modal.Secret.from_name("{modal_secret}")\n'
+        secret_str = f'pip_secret = modal.Secret.from_name("{_escape_string_for_codegen(modal_secret)}")\n'
         secrets_arg = "secrets=[pip_secret],"
 
     code = f'''"""
@@ -520,6 +546,7 @@ class ModalDeploymentClient(BaseDeploymentClient):
         Returns:
             Dictionary with deployment information including endpoint URL
         """
+        name = _sanitize_deployment_name(name)
         modal = _import_modal()
 
         with TempDir() as tmp_dir:
@@ -585,8 +612,6 @@ class ModalDeploymentClient(BaseDeploymentClient):
                 if wheel_files:
                     wheels_dir = os.path.join(tmp_dir.path(), "wheels")
                     os.makedirs(wheels_dir, exist_ok=True)
-                    import shutil
-
                     for whl in wheel_files:
                         shutil.copy(whl, wheels_dir)
                     _logger.info(f"Uploading {len(wheel_files)} wheel file(s) to volume")
@@ -719,6 +744,11 @@ class ModalDeploymentClient(BaseDeploymentClient):
         if deployment_name is None:
             raise MlflowException(
                 "deployment_name is required",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+        if inputs is None:
+            raise MlflowException(
+                "inputs is required for prediction",
                 error_code=INVALID_PARAMETER_VALUE,
             )
 

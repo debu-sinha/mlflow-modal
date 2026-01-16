@@ -6,10 +6,12 @@ import mlflow_modal
 from mlflow_modal.deployment import (
     SUPPORTED_GPUS,
     ModalDeploymentClient,
+    _escape_string_for_codegen,
     _generate_modal_app_code,
     _get_model_python_version,
     _get_model_requirements,
     _get_preferred_deployment_flavor,
+    _sanitize_deployment_name,
     _validate_deployment_flavor,
     target_help,
 )
@@ -822,3 +824,62 @@ class TestPrivateRepoConfig:
         assert 'extra_index_url="https://pypi.python.org/simple/"' in code
         assert 'modal.Secret.from_name("pypi-auth")' in code
         assert '"my-private-package>=1.0"' in code
+
+
+class TestSecurityValidation:
+    """Tests for input validation and security measures."""
+
+    def test_sanitize_valid_name(self):
+        assert _sanitize_deployment_name("my-model") == "my-model"
+        assert _sanitize_deployment_name("Model123") == "Model123"
+        assert _sanitize_deployment_name("test_deployment") == "test_deployment"
+
+    def test_sanitize_empty_name_raises(self):
+        from mlflow.exceptions import MlflowException
+
+        with pytest.raises(MlflowException, match="cannot be empty"):
+            _sanitize_deployment_name("")
+
+    def test_sanitize_too_long_name_raises(self):
+        from mlflow.exceptions import MlflowException
+
+        long_name = "a" * 64
+        with pytest.raises(MlflowException, match="exceeds 63 character limit"):
+            _sanitize_deployment_name(long_name)
+
+    def test_sanitize_invalid_chars_raises(self):
+        from mlflow.exceptions import MlflowException
+
+        invalid_names = [
+            "my model",  # space
+            "my;model",  # semicolon
+            "my'model",  # quote
+            'my"model',  # double quote
+            "123model",  # starts with number
+            "-mymodel",  # starts with hyphen
+        ]
+        for name in invalid_names:
+            with pytest.raises(MlflowException, match="Invalid deployment name"):
+                _sanitize_deployment_name(name)
+
+    def test_escape_string_basic(self):
+        assert _escape_string_for_codegen("hello") == "hello"
+        assert _escape_string_for_codegen("https://pypi.org/") == "https://pypi.org/"
+
+    def test_escape_string_quotes(self):
+        assert _escape_string_for_codegen('test"quote') == 'test\\"quote'
+
+    def test_escape_string_backslash(self):
+        assert _escape_string_for_codegen("path\\to\\file") == "path\\\\to\\\\file"
+
+    def test_escape_string_newline(self):
+        assert _escape_string_for_codegen("line1\nline2") == "line1\\nline2"
+
+    def test_escape_string_injection_attempt(self):
+        malicious = 'https://evil.com"); import os; os.system("rm -rf /'
+        escaped = _escape_string_for_codegen(malicious)
+        # Verify quotes are escaped, preventing code injection
+        assert '\\"' in escaped
+        # The escaped string should be safe when used in f'index_url="{escaped}"'
+        # because the quotes are escaped as \"
+        assert escaped == 'https://evil.com\\"); import os; os.system(\\"rm -rf /'
