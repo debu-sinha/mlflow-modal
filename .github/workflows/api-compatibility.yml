@@ -22,7 +22,7 @@ jobs:
       - name: Install latest dependencies
         run: |
           pip install --upgrade pip
-          pip install modal@latest mlflow@latest
+          pip install --upgrade modal mlflow
           pip install -e ".[dev]"
 
       - name: Show versions
