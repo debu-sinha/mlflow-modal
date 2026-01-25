@@ -37,11 +37,6 @@ flowchart LR
     B --> C[Modal Volume]
     C --> D[Generate Modal App]
     D --> E[HTTPS Endpoint]
-
-    style A fill:#FFE4B5
-    style C fill:#87CEEB
-    style D fill:#90EE90
-    style E fill:#DDA0DD
 ```
 
 1. **Extract**: MLflow model artifacts and dependencies are extracted from the model URI
