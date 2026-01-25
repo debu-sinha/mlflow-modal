@@ -9,7 +9,7 @@
 
 Deploy MLflow models to [Modal](https://modal.com)'s serverless GPU infrastructure with a single command.
 
-> **If you find this project useful, please consider giving it a ⭐!** It helps others discover the project and motivates continued development. Using it in production? [Share your experience](https://github.com/debu-sinha/mlflow-modal-deploy/issues) - we'd love to hear from you!
+> **If you find this project useful, please consider giving it a star!** It helps others discover the project and motivates continued development. Using it in production? [Share your experience](https://github.com/debu-sinha/mlflow-modal-deploy/issues) - we'd love to hear from you!
 
 ## Installation
 
@@ -28,6 +28,29 @@ pip install mlflow-modal-deploy
 - **Wheel file support**: Handles private dependencies packaged as wheel files
 - **Private PyPI support**: Deploy with private packages via `pip_index_url` or Modal secrets
 - **MLflow CLI integration**: Use familiar `mlflow deployments` commands
+
+## How it Works
+
+```mermaid
+flowchart LR
+    A[MLflow Model] --> B[Extract Dependencies]
+    B --> C[Modal Volume]
+    C --> D[Generate Modal App]
+    D --> E[HTTPS Endpoint]
+
+    style A fill:#FFE4B5
+    style C fill:#87CEEB
+    style D fill:#90EE90
+    style E fill:#DDA0DD
+```
+
+1. **Extract**: MLflow model artifacts and dependencies are extracted from the model URI
+2. **Upload**: Model files are uploaded to a Modal Volume for persistent storage
+3. **Generate**: A Modal app is generated with FastAPI endpoints (`/invocations`, `/predict_stream`)
+4. **Deploy**: Modal builds a container with all dependencies and deploys to serverless infrastructure
+5. **Serve**: An HTTPS endpoint URL is returned, ready to handle prediction requests
+
+The generated container mirrors your training environment, ensuring consistent behavior between development and production.
 
 ## Quick Start
 
@@ -115,6 +138,28 @@ modal setup
 export MODAL_TOKEN_ID=your-token-id
 export MODAL_TOKEN_SECRET=your-token-secret
 ```
+
+## Local Testing (Recommended)
+
+Before deploying to Modal's cloud infrastructure, test your deployment locally to catch issues early:
+
+```python
+from mlflow_modal import run_local
+
+run_local(
+    target_uri="modal",
+    name="test-model",
+    model_uri="runs:/abc123/model",
+    config={"gpu": "T4"}
+)
+```
+
+This runs `modal serve` locally, allowing you to verify:
+- Model loads correctly with all dependencies
+- Inference endpoint responds as expected
+- GPU configuration is valid
+
+Once local testing passes, deploy to production with `create_deployment()`.
 
 ## Advanced Usage
 
@@ -248,20 +293,56 @@ model/
 └── ...
 ```
 
-### Local Development
+## Troubleshooting
 
-Test your deployment locally before deploying to Modal:
+### Modal Authentication Fails
+
+```bash
+# Re-authenticate with Modal
+modal setup
+
+# Verify authentication
+modal profile list
+```
+
+### "MLmodel not found" Error
+
+- Ensure model was logged with `mlflow.pyfunc.log_model()` or similar MLflow logging function
+- Verify the model URI is correct: `runs:/<run_id>/model` or `models:/<name>/<version>`
+- Check that the model directory contains an `MLmodel` file
+
+### Deployment Times Out
+
+For large models that take longer to load:
 
 ```python
-from mlflow_modal import run_local
-
-run_local(
-    target_uri="modal",
-    name="test-model",
+client.create_deployment(
+    name="large-model",
     model_uri="runs:/abc123/model",
-    config={"gpu": "T4"}
+    config={
+        "startup_timeout": 600,  # 10 minutes for model loading
+        "timeout": 300,          # 5 minutes for inference requests
+    }
 )
 ```
+
+### Missing Dependencies at Runtime
+
+If the model fails with import errors:
+
+```python
+client.create_deployment(
+    name="my-model",
+    model_uri="runs:/abc123/model",
+    config={
+        "extra_pip_packages": ["missing-package>=1.0"],
+    }
+)
+```
+
+### View Build Logs
+
+Check the [Modal Dashboard](https://modal.com/apps) for detailed build and runtime logs.
 
 ## Requirements
 
@@ -299,7 +380,15 @@ Apache License 2.0
 - [MLflow](https://mlflow.org/) - Open source platform for the ML lifecycle
 - [Modal](https://modal.com/) - Serverless cloud for AI/ML
 
+## Useful Links
+
+- [Modal Documentation](https://modal.com/docs) - Modal platform docs and tutorials
+- [MLflow Deployment Guide](https://mlflow.org/docs/latest/deployment/index.html) - MLflow deployment concepts
+- [MLflow Model Format](https://mlflow.org/docs/latest/models.html) - Understanding MLflow models
+- [Modal GPU Guide](https://modal.com/docs/guide/gpu) - GPU types and configuration
+
 ## Support
 
 - [GitHub Issues](https://github.com/debu-sinha/mlflow-modal-deploy/issues) - Bug reports and feature requests
 - [MLflow Slack](https://mlflow.org/slack) - Community discussion
+- [Modal Community](https://modal.com/slack) - Modal-specific questions
