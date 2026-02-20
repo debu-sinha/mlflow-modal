@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-02-20
+
+### Fixed
+- Fixed IndentationError when deploying with `concurrent_inputs > 1` (the `@modal.concurrent` decorator was adding trailing whitespace that broke class indentation in the generated app)
+- Fixed SyntaxError when deploying models with many pip dependencies (>10 packages generated a single line too long for the Python parser)
+
+### Added
+- Added `A10G` to supported GPU types (Modal's primary GPU variant name alongside existing `A10`)
+
 ## [0.6.0] - 2026-01-16
 
 ### Added
