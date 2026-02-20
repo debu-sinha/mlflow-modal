@@ -254,7 +254,13 @@ def _generate_modal_app_code(
         pip_packages.extend(model_requirements)
     if extra_pip_packages:
         pip_packages.extend(extra_pip_packages)
-    uv_pip_install_str = ", ".join(f'"{pkg}"' for pkg in pip_packages)
+    uv_pip_install_args = [f'"{pkg}"' for pkg in pip_packages]
+    # Use multi-line formatting when there are many packages to avoid
+    # generating a single line too long for Python to parse
+    if len(uv_pip_install_args) > 10:
+        uv_pip_install_str = "\n        " + ",\n        ".join(uv_pip_install_args) + ",\n    "
+    else:
+        uv_pip_install_str = ", ".join(uv_pip_install_args)
 
     # Build pip install arguments for private repos (escape URLs for safe code generation)
     pip_install_kwargs = []
@@ -304,7 +310,7 @@ def _generate_modal_app_code(
             concurrent_args.append(f"max_inputs={concurrent_inputs}")
         if target_inputs is not None:
             concurrent_args.append(f"target_inputs={target_inputs}")
-        concurrent_decorator_line = f"@modal.concurrent({', '.join(concurrent_args)})\n        "
+        concurrent_decorator_line = f"@modal.concurrent({', '.join(concurrent_args)})\n"
 
     # Build secret reference if specified (escape for safe code generation)
     secret_str = ""
